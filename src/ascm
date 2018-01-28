@@ -1,0 +1,82 @@
+#!/usr/bin/python3
+
+import sys
+import signal
+from AscmMenu import *
+from AscmScreen import *
+
+
+
+usage_msg = """
+Usage:  %s <menu_file>
+
+Format of menu file:
+    * Comments (which beginning with a hash-sign) and empty lines are ignored.
+    * First data line is name of menu.
+    * All further lines ("data lines") define one menu item each.
+    * Menu structure is given by the indentation of data lines.
+    * Indentation is four spaces for one indentation level.
+    * Each data line consists of a label and an optional command, separated by
+      the command specifier '||x' (where x is a capital character).
+
+Command specifiers:
+    ||N   --> run command, do not wait after exit
+    ||W   --> run command, wait for Enter after exit
+    ||P   --> run command, pipe it to less pager
+    ||B   --> run command in background
+
+For the keyboard mapping, press '?'.
+
+""" % sys.argv[0]
+
+
+def close_curses_screen():
+    try:
+        if screen.is_curses_screen_on:
+            screen.close_curses_screen()
+    except:
+        pass
+
+
+def quit_program(signal, frame):
+    close_curses_screen()
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+
+    # Quit program gracefully on Ctrl-C and friends.
+    signal.signal(signal.SIGINT, quit_program)
+
+    try:
+        # Show help message
+        if len(sys.argv) >= 2 and sys.argv[1] == "-h":
+            print(usage_msg)
+            sys.exit(0)
+
+        # Regular program operation
+        elif len(sys.argv) == 2:
+            menu_file = sys.argv[1]
+            prg_name = sys.argv[0].split('/')[-1]
+
+            menu = AscmMenu(menu_file)
+            screen = AscmScreen(prg_name, menu)
+            screen.run()
+            close_curses_screen()
+            sys.exit(0)
+
+        # Wrong arguments
+        else:
+            print(usage_msg)
+            sys.exit(1)
+
+    except MenuError as e:
+        # Some error during reading the menu
+        print("%s" % str(e))
+        sys.exit(1)
+
+    except Exception:   # do not catch SystemExit exception
+        # Hmm, some error I didn't expect.
+        close_curses_screen()
+        raise
+

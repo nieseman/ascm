@@ -16,7 +16,7 @@ It is free software (GPL3), and tested on Linux.
 * Do you happen to regularly open a terminal window, just to execute some
 specific commands which are always the same? Then, ascm might be useful for you.
 Consider for instance the typical tasks listed in this [example
-file](doc/menu_ideas.txt).
+file](doc/menu_ideas.conf).
 * Other uses might include: remember some less-often used scripts you wrote;
 compile a reference of commands for documentation purposes; provide your friends
 and family (that you provide support to) a more user-friendly interface to
