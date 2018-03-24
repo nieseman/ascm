@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 import curses
-import sys
-import subprocess
-from AscmMenu import *
+from AscmTextMenu import *
+from AscmMenuFile import *
+from AscmExecCmd import *
 
 
 
@@ -24,33 +24,25 @@ q               quit program
 """
 
 
-class AscmScreen:
+class AscmUiCurses:
+    """
+    Curses user interface for ascm
+    
+    Front-end functions: __init__(), run(), close_curses_screen()
     """
 
-    Exceptions should happen only in curses or external program execution (but
-    not in code from this class)..
-    """
-
-    def __init__(self, prg_name, menu):
-        """
-        Initializer
-
-        Store given program name and menu control. Setup curses and draw screen.
-
-        Side effects:
-        - class attributes are defined
-        """
+    def __init__(self, menu_file):
 
         # Setup menu items
-        self.prg_name = prg_name
-        self.menu = menu
+        self.menu_file = menu_file
+        self.menu = AscmTextMenu(menu_file)
 
         # Setup curses
-        self.open_curses_screen()
+        self._open_curses_screen()
         self._redraw_screen()
 
 
-    def open_curses_screen(self):
+    def _open_curses_screen(self):
         self.stdscr = curses.initscr()
         self.is_curses_screen_on = True
         self.stdscr.keypad(True)
@@ -61,7 +53,10 @@ class AscmScreen:
 
 
     def close_curses_screen(self):
-        curses.endwin()
+        try:
+            curses.endwin()
+        except:
+            pass
         self.is_curses_screen_on = False
 
 
@@ -85,7 +80,7 @@ class AscmScreen:
 
     def _print_screen_border(self, name = ""):
         if name == "":
-            name = self.menu.name
+            name = self.menu.menu_file.name
         self.stdscr.border()
         self.stdscr.addstr(0, 10, " " + name + " ")
 
@@ -96,7 +91,7 @@ class AscmScreen:
             self.stdscr.addstr(line.idx_scr + 2, 2, line.text, attr)
 
 
-    def run(self):
+    def run_ui(self):
 
         while True:
             c = self.stdscr.getch()
@@ -111,7 +106,7 @@ class AscmScreen:
                 if cur_item.is_submenu:
                     self._move_cursor_and_print(Move.toggle_submenu)
                 else:
-                    self.execute_command(cur_item.cmd_kind, cur_item.cmd_str)
+                    self._run_command(cur_item.cmd_kind, cur_item.cmd_str)
 
             # l/Right = open submenu
             elif c in (curses.KEY_RIGHT, ord('l')):
@@ -156,20 +151,20 @@ class AscmScreen:
 
             # ? = show help screen
             elif c in (curses.KEY_F1, ord('?')):
-                if self.show_help():
+                if self._show_help():
                     break
                 self._redraw_screen()
 
             # window has been resized
 
 
-    def show_help(self):
+    def _show_help(self):
         """
         Show help screen on keyboard mapping, and wait until a key is pressed to
         close the window.
         """
         self.stdscr.clear()
-        self._print_screen_border("%s: Keyboard mapping" % self.prg_name)
+        self._print_screen_border("Keyboard mapping")
         for idx, line in enumerate(help_msg.split("\n")):
             self.stdscr.addstr(idx + 1, 2, line)
 
@@ -181,11 +176,7 @@ class AscmScreen:
         return c == ord('q')
 
 
-    def execute_command(self, cmd_kind, cmd_str):
-
-        def error_when_executing_command():
-            pass
-
+    def _run_command(self, cmd_kind, cmd_str):
 
         # Check if there's anything to do
         if cmd_kind == CommandKind.no_command:
@@ -199,23 +190,7 @@ class AscmScreen:
 
         # Run command
         try:
-            cmd_list = cmd_str.split()
-            if cmd_kind == CommandKind.no_wait:
-                subprocess.run(cmd_list)
-
-            elif cmd_kind == CommandKind.wait_for_enter:
-                subprocess.run(cmd_list)
-                print("\n... press <Enter>")
-                input()
-
-            elif cmd_kind == CommandKind.pipe_to_pager:
-                p1 = subprocess.Popen(cmd_list, stdout=subprocess.PIPE)
-                p2 = subprocess.Popen(["less"], stdin=p1.stdout)
-
-            elif cmd_kind == CommandKind.background:
-                subprocess.Popen(cmd_list)
-
-        # In case of error, print an error message
+            execute_command(cmd_kind, cmd_str)
         except Exception as e:
             if not switch_to_text_screen:
                 self.close_curses_screen()
@@ -223,11 +198,11 @@ class AscmScreen:
             print("During execution of command\n    %s\nan error occured:\n" \
                         "    %s\n\n... press <Enter>" % (cmd_str, str(e)))
             input()
-            self.open_curses_screen()
+            self._open_curses_screen()
 
         # Restore screen
         if switch_to_text_screen:
-            self.open_curses_screen()
+            self._open_curses_screen()
             self._print_screen_border()
             self._move_cursor_and_print(Move.none_but_reprint)
 

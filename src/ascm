@@ -2,8 +2,8 @@
 
 import sys
 import signal
-from AscmMenu import *
-from AscmScreen import *
+from AscmMenuFile import *
+from AscmUiCurses import *
 
 
 
@@ -30,16 +30,10 @@ For the keyboard mapping, press '?'.
 """ % sys.argv[0]
 
 
-def close_curses_screen():
-    try:
-        if screen.is_curses_screen_on:
-            screen.close_curses_screen()
-    except:
-        pass
-
-
 def quit_program(signal, frame):
-    close_curses_screen()
+    """ Close curses screen and quit program. """
+    if 'ui_curses' in dir():
+        ui_curses.close_curses_screen()
     sys.exit(0)
 
 
@@ -54,21 +48,20 @@ if __name__ == "__main__":
             print(usage_msg)
             sys.exit(0)
 
-        # Regular program operation
-        elif len(sys.argv) == 2:
-            menu_file = sys.argv[1]
-            prg_name = sys.argv[0].split('/')[-1]
-
-            menu = AscmMenu(menu_file)
-            screen = AscmScreen(prg_name, menu)
-            screen.run()
-            close_curses_screen()
-            sys.exit(0)
-
-        # Wrong arguments
-        else:
+        # Check arguments
+        if len(sys.argv) != 2:
             print(usage_msg)
             sys.exit(1)
+
+        # Regular program operation
+        menu_filename = sys.argv[1]
+        menu_file = AscmMenuFile(menu_filename)
+
+        ui_curses = AscmUiCurses(menu_file)
+        ui_curses.run_ui()
+        ui_curses.close_curses_screen()
+
+        sys.exit(0)
 
     except MenuError as e:
         # Some error during reading the menu
@@ -77,6 +70,7 @@ if __name__ == "__main__":
 
     except Exception:   # do not catch SystemExit exception
         # Hmm, some error I didn't expect.
-        close_curses_screen()
+        if 'ui_curses' in dir():
+            ui_curses.close_curses_screen()
         raise
 

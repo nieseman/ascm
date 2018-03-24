@@ -5,12 +5,6 @@ import enum
 
 
 
-class MenuError(Exception):
-    """ Exception class to be used for errors during reading of menu """
-    pass
-
-
-
 class Move(enum.Enum):
     """ Different kinds of movement in the menu """
     none_but_reprint = 11
@@ -29,36 +23,6 @@ class Move(enum.Enum):
 
 
 
-class CommandKind(enum.Enum):
-    """ Command kind of entries in menu files """
-    no_command = 1
-    no_wait = 2
-    wait_for_enter = 3
-    pipe_to_pager = 4
-    background = 5
-
-
-# Specifiers for commands in menu file
-cmd_kinds = {
-    'N': CommandKind.no_wait,
-    'W': CommandKind.wait_for_enter,
-    'P': CommandKind.pipe_to_pager,
-    'B': CommandKind.background,
-}
-
-
-# Tuple specifying one data line in menu file
-MenuItem = collections.namedtuple('MenuItem', [
-        'line_num',     # line number in menu file
-        'level',        # indentation level
-        'label',        # User-visible label in menu
-        'cmd_kind',     # of type CommandKind
-        'cmd_str',      # command string
-        'is_submenu'    # boolean
-])
-
-
-
 # Tuple specifying one line to be printed on screen
 PrintLine = collections.namedtuple('PrintLine', [
         'idx_scr',      # index on screen (i.e. line number)
@@ -68,7 +32,7 @@ PrintLine = collections.namedtuple('PrintLine', [
 
 
 
-class AscmMenu:
+class AscmTextMenu:
     """
     Handles the contents of a menu
 
@@ -84,64 +48,17 @@ class AscmMenu:
 
     add_three_dots_to_submenu_labels = True
 
-    def _err(self, msg, line_num = -1):
-        """ An error occured while processing the menu, so raise exception. """
-        if line_num < 0:
-            loc = "Menu file %s" % self.filename
-        else:
-            loc = "Menu file %s, line %i" % (self.filename, line_num)
-        raise MenuError("%s: %s" % (loc, msg))
-
-
-    def __init__(self, filename, print_commands = False):
-        """
-        Initialize menu from menu file
-
-        Define and initialize all object attributes
-        Construct item list
-
-        Side effects:
-        - object attributes are set
-        - MenuError exceptions may be raised
-        """
+    def __init__(self, menu_file):
+        """ Initialize text menu from menu file """
 
         # Define object attributes.
-        self.filename = filename
-        self.name = ""                  # header name of menu
-        self.items = []                 # flat list of MenuItem entries
+        self.menu_file = menu_file
         self.unfolded_items = []        # flat list of entries from self.items
         self.submenu_unfolded = {}      # dictionary from self.items -> bool
         self.h = 0                      # visible height of menu
         self.w = 0                      # visible width of menu
         self.pos_view = 0               # position of view (first visible line)
         self.pos_cur = 0                # position of cursor
-
-        # Determine attributes from file ('is_submenu' field not yet correct).
-        self.name, items = self._get_name_and_items_from_file(filename)
-        if len(items) == 0:
-            self._err("Menu file has no menu entries")
-
-        # Rebuild item list with correct 'is_submenu' field.
-        for i in range(len(items)):
-            item = items[i]
-            is_submenu = (i < len(items) - 1) and (items[i + 1].level > items[i].level)
-            if is_submenu and item.cmd_kind != CommandKind.no_command:
-                self._err("Simultaneous submenu and command", item.line_num)
-
-            assert(isinstance(item.line_num, int))
-            assert(isinstance(item.level, int))
-            assert(isinstance(item.label, str))
-    # TBD   assert(isinstance(item.cmd_kind, CommandKind))
-            assert(isinstance(item.cmd_str, str))
-            assert(isinstance(is_submenu, bool))
-
-            if is_submenu and self.add_three_dots_to_submenu_labels:
-                suffix = "..."
-            else:
-                suffix = ""
-            self.items.append(MenuItem(
-                        item.line_num, item.level, item.label + suffix,
-                        item.cmd_kind, item.cmd_str, is_submenu))
 
         # Set visible items
         self._determine_unfolded_items()
@@ -152,7 +69,7 @@ class AscmMenu:
         self.unfolded_items.clear()
         level_visible = 0
 
-        for item in self.items:
+        for item in self.menu_file.items:
 
             # If the item is within the visibility level, add it to the list.
             if item.level <= level_visible:
@@ -171,78 +88,10 @@ class AscmMenu:
 
 
     def set_screen_size(self, h, w):
-        max_label_width = max([len(item.label) for item in self.items])
+        max_label_width = max([len(item.label) for item in self.menu_file.items])
         self.w = min(w, max_label_width)
         self.h = h
         # TBD: make zero movement
-
-
-    def _get_name_and_items_from_file(self, filename):
-        """
-        Return name (first text line in file) and list of MenuItems.
-
-        Side effects:
-        - No object attributes are accessed/changed.
-        - MenuError might be raised.
-        - open() and readlines() may raise exceptions.
-        """
-
-        name = None
-        items = []
-        old_indent = -1
-
-        # Read menu file
-        try:
-            lines = open(filename, 'r').readlines()
-        except:
-            self._err("Cannot read file")
-
-        # Loop over all lines in menu file
-        for ln, line in enumerate(lines):
-            line_num = ln + 1
-
-            # Get data from this line, but ignore empty lines and comment lines.
-            if line == "" or line.isspace() or line.startswith("#"):
-                continue
-
-            # The first line provides the name of the menu.
-            if name is None:
-                name = line.strip()
-                continue
-
-            # Determine indentation of line.
-            num_spaces = len(line) - len(line.lstrip())
-            if num_spaces % 4 != 0:
-                self._err("Indentation mismatch", line_num)
-            level = num_spaces // 4
-            if level > old_indent + 1:
-                self._err("Indentation error", line_num)
-
-            # Separate label and comment in line.
-            pos = line.find("||")
-            if pos < 0:
-                label = line.rstrip()
-                cmd_kind = CommandKind.no_command 
-                cmd_str = ""
-            else:
-                label = line[:pos].rstrip()
-                if len(line) <= pos + 3:
-                    self._err("No command kind given", line_num)
-                cmd_kind_char = line[pos + 2]
-                if cmd_kind_char not in cmd_kinds:
-                    self._err("Invalid command kind given", line_num)
-                cmd_kind = cmd_kinds[cmd_kind_char]
-                cmd_str = line[pos + 3:].strip()
-                if cmd_str == "":
-                    self._err("Empty command", line_num)
-
-            # Create new menu item
-            items.append(MenuItem(line_num, level, label, cmd_kind, cmd_str, False))
-
-            # Continue loop
-            old_indent = level
-
-        return name, items
 
 
     def get_item_under_cursor(self):
@@ -389,13 +238,13 @@ class AscmMenu:
             self.submenu_unfolded[item] = True
 
             # Find cursor item in full list of items
-            for idx, _item in enumerate(self.items):
+            for idx, _item in enumerate(self.menu_file.items):
                 if _item is item:
                     break
             assert(_item is item)
                 
             # Unfold all lower-level submenus until this submenu ends
-            for subitem in self.items[idx + 1:]:
+            for subitem in self.menu_file.items[idx + 1:]:
                 if subitem.level <= level:
                     break
                 if subitem.is_submenu:
