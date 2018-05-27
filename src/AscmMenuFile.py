@@ -2,6 +2,9 @@
 
 import collections
 import enum
+import re
+
+from AscmExecCmd import *
 
 
 
@@ -10,34 +13,19 @@ class MenuError(Exception):
     pass
 
 
+separator_char = "-"
+separator_min_len = 4
 
-class CommandKind(enum.Enum):
-    """ Command kind of entries in menu files """
-    no_command = 1
-    no_wait = 2
-    wait_for_enter = 3
-    pipe_to_pager = 4
-    background = 5
+class MenuItem:
 
-
-# Specifiers for commands in menu file
-cmd_kinds = {
-    'N': CommandKind.no_wait,
-    'W': CommandKind.wait_for_enter,
-    'P': CommandKind.pipe_to_pager,
-    'B': CommandKind.background,
-}
-
-
-# Tuple specifying one data line in menu file
-MenuItem = collections.namedtuple('MenuItem', [
-        'line_num',     # line number in menu file
-        'level',        # indentation level
-        'label',        # User-visible label in menu
-        'cmd_kind',     # of type CommandKind
-        'cmd_str',      # command string
-        'is_submenu'    # boolean
-])
+    def __init__(self, line_num, level, label, cmd, is_separator):
+        self.line_num = line_num
+        self.level = level
+        self.label = label
+        self.cmd = cmd
+        self.subitems = []
+        self.is_separator = is_separator
+        self.is_submenu = False
 
 
 
@@ -49,9 +37,9 @@ class AscmMenuFile:
     a list of MenuItem objects.
     """
 
-    def _error(self, msg, line_num = -1):
+    def _error(self, msg, line_num = None):
         """ An error occured while processing the menu, so raise exception. """
-        if line_num < 0:
+        if line_num is None:
             loc = "Menu file %s" % self.filename
         else:
             loc = "Menu file %s, line %i" % (self.filename, line_num)
@@ -72,38 +60,54 @@ class AscmMenuFile:
 
         # Define object attributes.
         self.filename = filename
-        self._set_name_and_items_from_file(filename)
-        if len(self._prel_items) == 0:
+        self.name, self.flat_list = self.get_flat_list(filename)
+        if len(self.flat_list) == 0:
             self._error("Menu file has no menu entries")
-        self._compose_final_item_list(submenu_suffix)
-        self._prel_items.clear()
+        self.nested_list = self.get_nested_list(self.flat_list, submenu_suffix)
+
+        for item in self.flat_list:
+            if item.subitems:
+                item.is_submenu = True
+                item.label += submenu_suffix
+       #self.flat_list.clear()
 
 
-    def _compose_final_item_list(self, submenu_suffix):
+    def get_nested_list(self, flat_list, submenu_suffix):
+
         # Rebuild item list with correct 'is_submenu' field.
-        self.items = []
-        for i in range(len(self._prel_items)):
-            item = self._prel_items[i]
-            is_submenu = (i < len(self._prel_items) - 1) and \
-                         (self._prel_items[i + 1].level > self._prel_items[i].level)
-            if is_submenu and item.cmd_kind != CommandKind.no_command:
-                self._error("Simultaneous submenu and command", item.line_num)
+        # Attribute 'level' has already been checked in get_flat_list().
+        main_items = []
+        last_items = []
+        last_level = 0
 
-            assert(isinstance(item.line_num, int))
-            assert(isinstance(item.level, int))
-            assert(isinstance(item.label, str))
-            assert(isinstance(item.cmd_kind, enum.Enum))
-            assert(isinstance(item.cmd_str, str))
-            assert(isinstance(is_submenu, bool))
+        for item in flat_list:
 
-            self.items.append(MenuItem(
-                        item.line_num, item.level, item.label + submenu_suffix,
-                        item.cmd_kind, item.cmd_str, is_submenu))
+            # If indentataion level is reduced (compared to previous item), skip
+            # finished indentation levels.
+            last_items = last_items[:item.level + 1]
+
+            # Add this item, either to main level of items or to lower level;
+            # and store current item as last item on respective indentation
+            # level.
+            if item.level == 0:
+                main_items.append(item)
+                last_items = [item]
+            else:
+                last_items[item.level - 1].subitems.append(item)
+                if item.level <= last_level:
+                    last_items[item.level] = item
+                else:
+                    last_items.append(item)
+
+            # Remember indentation level.
+            last_level = item.level
+
+        return main_items
 
 
-    def _set_name_and_items_from_file(self, filename):
+    def get_flat_list(self, filename):
         """
-        Return name (first text line in file) and list of MenuItems.
+        Set name (first text line in file) and list of MenuItems.
 
         Side effects:
         - self.name and self.prel_items are set
@@ -111,58 +115,79 @@ class AscmMenuFile:
         - open() and readlines() may raise exceptions.
         """
 
-        self.name = None
-        self._prel_items = []
-        old_indent = -1
+        def skip_comments(line):
+            pos = line.find("#")
+            if pos >= 0:
+                line = line[:pos]
+            return line.rstrip()
 
-        # Read menu file
-        try:
-            lines = open(filename, 'r').readlines()
-        except:
-            self._error("Cannot read file")
 
-        # Loop over all lines in menu file
-        for ln, line in enumerate(lines):
-            line_num = ln + 1
-
-            # Get data from this line, but ignore empty lines and comment lines.
-            if line == "" or line.isspace() or line.startswith("#"):
-                continue
-
-            # The first line provides the name of the menu.
-            if self.name is None:
-                self.name = line.strip()
-                continue
-
-            # Determine indentation of line.
+        def get_indent_level(line):
+            indent_width = 4
             num_spaces = len(line) - len(line.lstrip())
-            if num_spaces % 4 != 0:
+            if num_spaces % indent_width != 0:
                 self._error("Indentation mismatch", line_num)
-            level = num_spaces // 4
-            if level > old_indent + 1:
-                self._error("Indentation error", line_num)
+            return num_spaces // indent_width
+
+
+        def split_entry(line):
+            label = line
+            is_separator = (reg.match(line) is not None)
+            cmd = None
 
             # Separate label and comment in line.
-            pos = line.find("||")
-            if pos < 0:
-                label = line.rstrip()
-                cmd_kind = CommandKind.no_command 
-                cmd_str = ""
-            else:
-                label = line[:pos].rstrip()
-                if len(line) <= pos + 3:
-                    self._error("No command kind given", line_num)
-                cmd_kind_char = line[pos + 2]
-                if cmd_kind_char not in cmd_kinds:
-                    self._error("Invalid command kind given", line_num)
-                cmd_kind = cmd_kinds[cmd_kind_char]
-                cmd_str = line[pos + 3:].strip()
-                if cmd_str == "":
-                    self._error("Empty command", line_num)
+            if not is_separator:
+                pos = line.find("§§")
+                if pos >= 0:
+                    label = line[:pos]
+                    cmd_str = line[pos + 2:]
+                    if cmd_str and cmd_str[0]:
+                        pos = cmd_str.find(" ")
+                        options = cmd_str[:pos]
+                        cmd_str = cmd_str[pos:]
+                    else:
+                        options = ""
+                    cmd_str = cmd_str.strip()
+                    cmd = Command(label.strip(), cmd_str, options)
 
-            # Create new menu item
-            self._prel_items.append(MenuItem(line_num, level, label, cmd_kind, cmd_str, False))
+            return label.strip(), is_separator, cmd
 
-            # Continue loop
-            old_indent = level
 
+        # Main part of get_flat_file().
+        name = None
+        flat_list = []
+
+        # Read menu file
+        line_num = 0
+        old_indent = -1
+        reg = re.compile("^ *%s{%i,}$" % (separator_char, separator_min_len))
+        with open(filename, 'r') as fh:
+            for line in fh.readlines():
+                line_num += 1
+
+                # Cut comments, skip empty lines.
+                line = skip_comments(line)
+                if line == "":
+                    continue
+
+                # The first line provides the name of the menu.
+                if name is None:
+                    name = line.strip()
+                    continue
+
+                # Determine indentation level of line.
+                level = get_indent_level(line)
+                assert(level >= 0)
+                if level > old_indent + 1:
+                    self._error("Indentation error", line_num)
+
+                # Check if label is a separator
+                label, is_separator, cmd = split_entry(line)
+
+                # Create new menu item
+                flat_list.append(MenuItem(line_num, level, label, cmd, is_separator))
+
+                # Continue loop
+                old_indent = level
+
+        return name, flat_list

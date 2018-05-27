@@ -2,7 +2,6 @@
 
 import curses
 from AscmTextMenu import *
-from AscmMenuFile import *
 from AscmExecCmd import *
 
 
@@ -24,6 +23,20 @@ q               quit program
 """
 
 
+# TBD TBD TBD
+    # Quit program gracefully on Ctrl-C and friends.
+#   signal.signal(signal.SIGINT, quit_program)
+# TBD TBD TBD
+
+
+def quit_program(signal, frame):
+    """ Close curses screen and quit program. """
+    if 'ui_curses' in dir():
+        ui_curses.close_curses_screen()
+    sys.exit(0)
+
+
+
 class AscmUiCurses:
     """
     Curses user interface for ascm
@@ -31,9 +44,12 @@ class AscmUiCurses:
     Front-end functions: __init__(), run(), close_curses_screen()
     """
 
-    def __init__(self, menu_file):
+    def __init__(self, filename, opt):
+#TBD       menu_file = AscmMenuFile(menu_filename, true)
 
         # Setup menu items
+        self.filename = filename
+        self.opt = opt
         self.menu_file = menu_file
         self.menu = AscmTextMenu(menu_file)
 
@@ -91,7 +107,7 @@ class AscmUiCurses:
             self.stdscr.addstr(line.idx_scr + 2, 2, line.text, attr)
 
 
-    def run_ui(self):
+    def run(self):
 
         while True:
             c = self.stdscr.getch()
@@ -106,7 +122,7 @@ class AscmUiCurses:
                 if cur_item.is_submenu:
                     self._move_cursor_and_print(Move.toggle_submenu)
                 else:
-                    self._run_command(cur_item.cmd_kind, cur_item.cmd_str)
+                    self._run_command(cur_item.cmd)
 
             # l/Right = open submenu
             elif c in (curses.KEY_RIGHT, ord('l')):
@@ -158,6 +174,10 @@ class AscmUiCurses:
             # window has been resized
 
 
+    def finish(self):
+        self.close_curses_screen()
+
+
     def _show_help(self):
         """
         Show help screen on keyboard mapping, and wait until a key is pressed to
@@ -176,10 +196,10 @@ class AscmUiCurses:
         return c == ord('q')
 
 
-    def _run_command(self, cmd_kind, cmd_str):
+    def _run_command(self, cmd):
 
         # Check if there's anything to do
-        if cmd_kind == CommandKind.no_command:
+        if not cmd_kind:
             return
 
         # Prepare screen

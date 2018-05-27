@@ -1,76 +1,60 @@
 #!/usr/bin/python3
 
-import sys
+import argparse
 import signal
-from AscmMenuFile import *
-from AscmUiCurses import *
-
-
-
-usage_msg = """
-Usage:  %s <menu_file>
-
-Format of menu file:
-    * Comments (which beginning with a hash-sign) and empty lines are ignored.
-    * First data line is name of menu.
-    * All further lines ("data lines") define one menu item each.
-    * Menu structure is given by the indentation of data lines.
-    * Indentation is four spaces for one indentation level.
-    * Each data line consists of a label and an optional command, separated by
-      the command specifier '||x' (where x is a capital character).
-
-Command specifiers:
-    ||N   --> run command, do not wait after exit
-    ||W   --> run command, wait for Enter after exit
-    ||P   --> run command, pipe it to less pager
-    ||B   --> run command in background
-
-For the keyboard mapping, press '?'.
-
-""" % sys.argv[0]
+import sys
+from AscmExecCmd import *
 
 
 def quit_program(signal, frame):
     """ Close curses screen and quit program. """
-    if 'ui_curses' in dir():
-        ui_curses.close_curses_screen()
+    ui.close_curses_screen()
     sys.exit(0)
 
 
 if __name__ == "__main__":
 
-    # Quit program gracefully on Ctrl-C and friends.
-    signal.signal(signal.SIGINT, quit_program)
+    # Obtain command-line arguments.
+    parser = argparse.ArgumentParser(
+            description = "Offer command menu from menu file")
+    parser.add_argument('--ui',
+            choices = ["curses", "tray", "window"],
+            default = "tray",
+            help = "choose user interface (default: 'tray')")
+    parser.add_argument('--root',
+            choices = ["su", "sudo", "pkexec"],
+            help = "method to gain root priviledges")
+    parser.add_argument('menu_file',
+            nargs = 1,
+            help = "menu configuration file (see menu_syntax)")
+    args = parser.parse_args()
 
-    try:
-        # Show help message
-        if len(sys.argv) >= 2 and sys.argv[1] == "-h":
-            print(usage_msg)
-            sys.exit(0)
+    # Further process command-line arguments into 'opt'.
+    opt = {}
+    opt["menu_file"] = args.menu_file[0]
+    if "root" == "su":
+        opt["root"] = RootMethod.su
+    elif "root" == "sudo":
+        opt["root"] = RootMethod.sudo
+    elif "root" == "pkexec":
+        opt["root"] = RootMethod.pkexec
 
-        # Check arguments
-        if len(sys.argv) != 2:
-            print(usage_msg)
-            sys.exit(1)
+    # Prepare ascm interface to run.
+    if args.ui == "curses":
+        import signal
+        signal.signal(signal.SIGINT, quit_program)
+        import AscmUiCurses
+        Ui = AscmUiCurses.AscmUiCurses
+        if "root" not in opt:
+            opt["root"] = RootMethod.sudo
+    else:
+        import AscmUiGtk
+        Ui = AscmUiGtk.AscmUiGtk
+        opt["show_window"] = (args.ui == "window")
+        if "root" not in opt:
+            opt["root"] = RootMethod.pkexec
 
-        # Regular program operation
-        menu_filename = sys.argv[1]
-        menu_file = AscmMenuFile(menu_filename)
-
-        ui_curses = AscmUiCurses(menu_file)
-        ui_curses.run_ui()
-        ui_curses.close_curses_screen()
-
-        sys.exit(0)
-
-    except MenuError as e:
-        # Some error during reading the menu
-        print("%s" % str(e))
-        sys.exit(1)
-
-    except Exception:   # do not catch SystemExit exception
-        # Hmm, some error I didn't expect.
-        if 'ui_curses' in dir():
-            ui_curses.close_curses_screen()
-        raise
-
+    # Run ascm interface.
+    ui = Ui(opt)
+    ui.run()
+    ui.finish()
