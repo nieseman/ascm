@@ -47,13 +47,14 @@ class Command:
             unknown_bits = options - (options & all_bits)
             if unknown_bits > 0:
                 raise Exception("Unknown command option bits: '%i'" % unknown_bits)
-                raise
 
         # Check for reasonable combination of options.
         if self.wait_after_cmd and not self.run_in_terminal:
-            raise
-        if self.run_in_background and (self.wait_after_cmd or self.run_in_terminal):
-            raise
+            raise Exception("Bad combination of attributes: wait_after_cmd and not run_in_terminal")
+        if self.run_in_background and self.wait_after_cmd:
+            raise Exception("Bad combination of attributes: run_in_background and wait_after_cmd")
+        if self.run_in_background and self.run_in_terminal:
+            raise Exception("Bad combination of attributes: run_in_background and run_in_terminal")
 
 
     def options_int(self):

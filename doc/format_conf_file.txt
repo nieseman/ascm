@@ -1,0 +1,18 @@
+conf_file_format = """
+Format of menu file:
+    * Comments (which beginning with a hash-sign) and empty lines are ignored.
+    * First data line is name of menu.
+    * All further lines ("data lines") define one menu item each.
+    * Menu structure is given by the indentation of data lines.
+    * Indentation is four spaces for one indentation level.
+    * Each data line consists of a label and an optional command, separated by
+      the command specifier '&&x', where x is zero or more character indicating
+      the command attributes.
+
+Command attributes:
+    w = wait after command (default: no wait)
+    t = run in terminal (default: no terminal)
+    b = run in background (default: no background)
+    r = use root permissions (via sudo or policy-kit)
+"""
+
