@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
+import logging
 import signal
 import sys
 from AscmExecCmd import *
@@ -24,14 +25,19 @@ if __name__ == "__main__":
     parser.add_argument('--root',
             choices = ["su", "sudo", "pkexec"],
             help = "method to gain root priviledges")
+    parser.add_argument('--output',
+            choices = ["normal", "info", "debug"],
+            help = "method to gain root priviledges")
     parser.add_argument('menu_file',
             nargs = 1,
             help = "menu configuration file (see menu_syntax)")
     args = parser.parse_args()
 
-    # Further process command-line arguments into 'opt'.
+    # Evaluate command-line arguments into 'opt'.
     opt = {}
+    opt["ui"] = args.ui
     opt["menu_file"] = args.menu_file[0]
+
     if "root" == "su":
         opt["root"] = RootMethod.su
     elif "root" == "sudo":
@@ -39,20 +45,38 @@ if __name__ == "__main__":
     elif "root" == "pkexec":
         opt["root"] = RootMethod.pkexec
 
-    # Prepare ascm interface to run.
+    opt["log_level"] = logging.WARNING
+    if args.output == "normal":
+        opt["log_level"] = logging.WARNING
+    elif args.output == "info":
+        opt["log_level"] = logging.INFO
+    elif args.output == "debug":
+        opt["log_level"] = logging.DEBUG
+
+    if opt["ui"] == "curses":
+        if "root" not in opt:
+            opt["root"] = RootMethod.sudo
+    else:   # ui == "window" or "tray"
+        opt["show_window"] = (args.ui == "window")
+        if "root" not in opt:
+            opt["root"] = RootMethod.pkexec
+
+    # Debug output: selected options.
+    logging.basicConfig(level = opt["log_level"])
+    logging.debug("")
+    logging.debug("Selected program options:")
+    for key, value in opt.items():
+        logging.debug(f"    {key} = {value}")
+
+    # Prepare ascm interface object.
     if args.ui == "curses":
         import signal
         signal.signal(signal.SIGINT, quit_program)
         import AscmUiCurses
         Ui = AscmUiCurses.AscmUiCurses
-        if "root" not in opt:
-            opt["root"] = RootMethod.sudo
-    else:
+    else:   # ui == "window" or "tray"
         import AscmUiGtk
         Ui = AscmUiGtk.AscmUiGtk
-        opt["show_window"] = (args.ui == "window")
-        if "root" not in opt:
-            opt["root"] = RootMethod.pkexec
 
     # Run ascm interface.
     ui = Ui(opt)

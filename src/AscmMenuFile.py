@@ -2,6 +2,7 @@
 
 import collections
 import enum
+import logging
 import re
 
 from AscmExecCmd import *
@@ -57,6 +58,9 @@ class AscmMenuFile:
         - object attributes are set
         - MenuError exceptions may be raised
         """
+        # Debug output: filename
+        logging.debug("")
+        logging.info(f"Reading menu file: {filename}")
 
         # Define object attributes.
         self.filename = filename
@@ -173,11 +177,14 @@ class AscmMenuFile:
                 # The first line provides the name of the menu.
                 if name is None:
                     name = line.strip()
+                    logging.debug(f"Name of menu: {name}")
                     continue
 
                 # Determine indentation level of line.
                 level = get_indent_level(line)
                 assert(level >= 0)
+                logging.debug("")
+                logging.debug(f"line {line_num}, indent level = {level}: {line}")
                 if level > old_indent + 1:
                     self._error("Indentation error", line_num)
 
