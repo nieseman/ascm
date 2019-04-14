@@ -41,10 +41,10 @@ class AscmMenuFile:
     def _error(self, msg, line_num = None):
         """ An error occured while processing the menu, so raise exception. """
         if line_num is None:
-            loc = "Menu file %s" % self.filename
+            loc = f"Menu file {self.filename}"
         else:
-            loc = "Menu file %s, line %i" % (self.filename, line_num)
-        raise MenuError("%s: %s" % (loc, msg))
+            loc = f"Menu file {self.filename}, line {line_num}"
+        raise MenuError(f"{loc}: {msg}")
 
 
     def __init__(self, filename, submenu_suffix = ""):

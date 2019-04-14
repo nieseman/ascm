@@ -160,8 +160,8 @@ class AscmUiGtk():
         try:
             menu_file = AscmMenuFile(self.options["menu_file"])
         except MenuError as e:
-            err_msg = "Cannot process input file %s.\nReason: %s" % \
-                        (self.options["menu_file"], e)
+            err_msg = f"Cannot process menu file {self.options['menu_file']}.\n" + \
+                       "Reason: {e}"
             gtk.MessageDialog(
                     parent = None, 
                     flags = gtk.DialogFlags.MODAL,
@@ -216,8 +216,6 @@ class AscmUiGtk():
 
 
     def edit_menu_file(self, dummy):
-        print("Hi!")
-        return
         """ Edit the menu file in an external editor. """
         self.cmd_executor.edit(self.options["menu_file"])
 

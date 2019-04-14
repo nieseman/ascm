@@ -136,7 +136,8 @@ class AscmTextMenu:
 
         # If view has moved or full print is forced, return list with all
         # visible lines of menu.
-        fmt = "%%-%is" % (self.w)
+        fmt = f"%-{self.w}s"
+# TBD   fmt = "%%-%is" % (self.w)
         if full_print or self.pos_view != old_pos_view:
             empty_line = " " * self.w
             lines = []

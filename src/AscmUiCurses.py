@@ -215,8 +215,11 @@ class AscmUiCurses:
             if not switch_to_text_screen:
                 self.close_curses_screen()
                 switch_to_text_screen = True
-            print("During execution of command\n    %s\nan error occured:\n" \
-                        "    %s\n\n... press <Enter>" % (cmd_str, str(e)))
+            print(f"During execution of command\n" + \
+                   "    {cmd_str}\n" + \
+                   "an error occured:\n" + \
+                   "    {str(e)}\n\n" + \
+                   "... press <Enter>")
             input()
             self._open_curses_screen()
 
