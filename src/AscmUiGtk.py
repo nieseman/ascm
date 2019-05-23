@@ -62,7 +62,11 @@ class AscmUiGtk():
 
 
         def create_tray_icon():
-            icon_path = os.path.abspath("play.png")
+            if options["icon"]:
+                icon_path = options["icon"]
+            else:
+                icon_path = "play.png"
+            icon_path = os.path.abspath(icon_path)
             appindicator_id = 'ascm_indicator'
             tray_menu = gtk.Menu()
             indicator = appindicator.Indicator.new(

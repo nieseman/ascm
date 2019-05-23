@@ -22,6 +22,9 @@ if __name__ == "__main__":
             choices = ["curses", "tray", "window"],
             default = "tray",
             help = "choose user interface (default: 'tray')")
+    parser.add_argument('--icon',
+            default = "",
+            help = "provide image file for tray icon")
     parser.add_argument('--root',
             choices = ["su", "sudo", "pkexec"],
             help = "method to gain root priviledges")
@@ -37,6 +40,7 @@ if __name__ == "__main__":
     opt = {}
     opt["ui"] = args.ui
     opt["menu_file"] = args.menu_file[0]
+    opt["icon"] = args.icon
 
     if "root" == "su":
         opt["root"] = RootMethod.su
