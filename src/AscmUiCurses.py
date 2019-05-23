@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 
 import curses
-from AscmTextMenu import *
 from AscmExecCmd import *
+from AscmMenuFile import *
+from AscmTextMenu import *
 
 
 
@@ -44,13 +45,12 @@ class AscmUiCurses:
     Front-end functions: __init__(), run(), close_curses_screen()
     """
 
-    def __init__(self, filename, opt):
-#TBD       menu_file = AscmMenuFile(menu_filename, true)
+    def __init__(self, options):
+        self.cmd_executor = CommandExecutor(False, options["root"])
 
         # Setup menu items
-        self.filename = filename
-        self.opt = opt
-        self.menu_file = menu_file
+        submenu_suffix = "..."
+        menu_file = AscmMenuFile(options["menu_file"], submenu_suffix)
         self.menu = AscmTextMenu(menu_file)
 
         # Setup curses
@@ -98,7 +98,7 @@ class AscmUiCurses:
         if name == "":
             name = self.menu.menu_file.name
         self.stdscr.border()
-        self.stdscr.addstr(0, 10, " " + name + " ")
+        self.stdscr.addstr(0, 10, f" {name} ")
 
 
     def _move_cursor_and_print(self, movement = Move.none_but_reprint):
@@ -198,34 +198,25 @@ class AscmUiCurses:
 
     def _run_command(self, cmd):
 
-        # Check if there's anything to do
-        if not cmd_kind:
+        # Check if there's anything to do.
+        if cmd.cmd_str == "":
             return
+        switch_to_text_screen = not cmd.run_in_background
 
-        # Prepare screen
-        switch_to_text_screen = (cmd_kind != CommandKind.background)
+        # Prepare screen.
         if switch_to_text_screen:
             self.close_curses_screen()
             print("_" * 60)
 
-        # Run command
-        try:
-            execute_command(cmd_kind, cmd_str)
-        except Exception as e:
-            if not switch_to_text_screen:
-                self.close_curses_screen()
-                switch_to_text_screen = True
-            print(f"During execution of command\n" + \
-                   "    {cmd_str}\n" + \
-                   "an error occured:\n" + \
-                   "    {str(e)}\n\n" + \
-                   "... press <Enter>")
-            input()
-            self._open_curses_screen()
+        # Run command.
+        self.cmd_executor.run(cmd)
 
-        # Restore screen
+        # Wait for Enter.
+        if cmd.wait_after_cmd:
+            input()
+
+        # Restore screen.
         if switch_to_text_screen:
             self._open_curses_screen()
             self._print_screen_border()
             self._move_cursor_and_print(Move.none_but_reprint)
-

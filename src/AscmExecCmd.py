@@ -137,6 +137,19 @@ class CommandExecutor:
             os.setsid()
             sys.exit(0)
 
+        # Run command.
+#       fh = open("/home/manni/tmp/ascm.log", "a")
+#       print("", file = fh, flush = True)
+#       if os.fork() == 0:
+#           print("Fork!", file = fh, flush = True)
+#           cp = subprocess.run(cmd, shell = True)
+#           print(type(cp), file = fh, flush = True)
+#           print(cp, file = fh, flush = True)
+#           os.setsid()
+#           sys.exit(0)
+#       else:
+#           print("Parent!", file = fh, flush = True)
+
         # Wait after command.
         if not self.run_from_gui and command.wait_after_cmd:
             pass    # TBD: wait

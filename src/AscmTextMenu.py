@@ -46,8 +46,6 @@ class AscmTextMenu:
         * action()
     """
 
-    add_three_dots_to_submenu_labels = True
-
     def __init__(self, menu_file):
         """ Initialize text menu from menu file """
 
@@ -60,6 +58,10 @@ class AscmTextMenu:
         self.pos_view = 0               # position of view (first visible line)
         self.pos_cur = 0                # position of cursor
 
+        # Add indentation to menu items
+        for item in self.menu_file.flat_list:
+            item.label = ("    " * item.level) + item.label
+
         # Set visible items
         self._determine_unfolded_items()
 
@@ -69,7 +71,7 @@ class AscmTextMenu:
         self.unfolded_items.clear()
         level_visible = 0
 
-        for item in self.menu_file.items:
+        for item in self.menu_file.flat_list:
 
             # If the item is within the visibility level, add it to the list.
             if item.level <= level_visible:
@@ -88,7 +90,7 @@ class AscmTextMenu:
 
 
     def set_screen_size(self, h, w):
-        max_label_width = max([len(item.label) for item in self.menu_file.items])
+        max_label_width = max([len(item.label) for item in self.menu_file.flat_list])
         self.w = min(w, max_label_width)
         self.h = h
         # TBD: make zero movement
