@@ -65,7 +65,7 @@ class AscmUiGtk():
             if options["icon"]:
                 icon_path = options["icon"]
             else:
-                icon_path = "play.png"
+                icon_path = "ascm_play_solid.svg"
             icon_path = os.path.abspath(icon_path)
             appindicator_id = 'ascm_indicator'
             tray_menu = gtk.Menu()
