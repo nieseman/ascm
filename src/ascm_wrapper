@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+#
+# Wrapper to execute one from a set of commands (pre-defined in a JSON file).
+#
+
+import argparse
+import json
+import subprocess
+import sys
+from typing import Dict
+
+from AscmConfFile import *
+
+
+def get_args() -> argparse.Namespace:
+    """
+    Obtain command-line arguments.
+    """
+    parser = argparse.ArgumentParser(description='Execute configured command.')
+    parser.add_argument('file',
+            help='name of JSON file containing command aliases')
+    parser.add_argument('alias', nargs='?', default="",
+            help='alias of command to be executed')
+    parser.add_argument('--list', action='store_true',
+            help='list all command aliases in JSON file')
+
+    return parser.parse_args()
+
+
+def load_json(file_name: str) -> Dict[str, str]:
+    """
+    Read the given JSON file, and deliver a str-to-str dict of command aliases.
+    """
+    data = json.load(open(file_name))
+
+    # Check structure of JSON
+    assert type(data) is dict, "Top-level element must be a dict."
+    check_dict_str_to_str(data, 'variables')
+    check_dict_str_to_str(data, 'aliases')
+
+    # Deliver essential results, ignore other parts of JSON file.
+    return data['variables'], data['aliases']
+
+
+def error(msg: str):
+    """
+    Print error message to stderr and quit.
+    """
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+
+def main():
+    """
+    Main program
+    """
+
+    # Get command-line arguments, and load JSON file.
+    args = get_args()
+    try:
+        vars, cmds = load_json(args.file)
+    except Exception as e:
+        error(f"Could not load file {args.file}: {e}.")
+
+    # If requested, list available command aliases.
+    if args.list:
+        for alias in cmds:
+            print(alias)
+        sys.exit(0)
+
+    # Determine command to be executed.
+    try:
+        cmd = cmds[args.alias]
+    except KeyError:
+        error(f"Command alias '{args.alias}' not found in file {args.file}.")
+    cmd = expand_vars(cmd, vars)
+
+    # Execute command.
+    rc = subprocess.run(cmd, shell = True)
+    sys.exit(rc.returncode)
+
+
+if __name__ == "__main__":
+    main()
