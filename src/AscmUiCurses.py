@@ -103,7 +103,7 @@ class AscmUiCurses:
 
     def _move_cursor_and_print(self, movement = Move.none_but_reprint):
         for line in self.menu.action(movement):
-            attr = curses.A_BOLD if line.is_cursor else curses.A_NORMAL
+            attr = curses.A_REVERSE if line.is_cursor else curses.A_NORMAL
             self.stdscr.addstr(line.idx_scr + 2, 2, line.text, attr)
 
 

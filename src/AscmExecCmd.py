@@ -117,7 +117,9 @@ class CommandExecutor:
 
         if command.run_in_terminal:
             if self.run_from_gui:
-                cmd = f"xterm -title '{command.label}' " + \
+                # TBD: Use self.terminal
+                # TBD: properly handles terminal options
+                cmd = f"xterm -title '{command.label}' -geometry 120x20 " + \
                       f"{'-hold' if command.wait_after_cmd else ''} " + \
                       f"-e '{cmd}'"
         else:
