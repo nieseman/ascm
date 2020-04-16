@@ -1,7 +1,7 @@
 #!/usr/bin/python3
-#
-# AscmExecCmd.py: Execution of commands.
-#
+"""
+AscmExecCmd.py: Execution of commands.
+"""
 
 import logging
 import os
@@ -22,7 +22,7 @@ class Command:
     """
 
     def __init__(self, label: str, cmd_str: str,
-            wait=False, term=False, back=False, root=False):
+                 wait=False, term=False, back=False, root=False):
         self.label = label
         self.cmd_str = cmd_str
         self.wait = wait
@@ -69,11 +69,11 @@ class CommandExecutor:
         Get terminal emulator program.
         """
         editor_choices = [
-                "x-terminal-emulator",
-                "xfce4-terminal",
-                "gnome-terminal",
-                "konsole",
-                "xterm"]
+            "x-terminal-emulator",
+            "xfce4-terminal",
+            "gnome-terminal",
+            "konsole",
+            "xterm"]
 
         terminal = self.get_first_executable_program(editor_choices)
         if terminal is not None:
@@ -153,7 +153,7 @@ class CommandExecutor:
         # Wait after command.
         if not self.run_from_gui and command.wait:
             pass    # TBD: wait
-            
+
 
     def edit(self, filename):
         cmd = f"{self.get_editor()} {filename}"

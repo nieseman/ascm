@@ -1,13 +1,12 @@
 #!/usr/bin/python3
-#
-# AscmMenuFile.py: Handling of menu file.
-#
+"""
+AscmMenuFile.py: Handling of menu file.
+"""
 
-import collections
 import logging
 import re
 
-from AscmExecCmd import *
+from AscmExecCmd import Command
 
 
 
@@ -16,13 +15,15 @@ class MenuError(Exception):
     pass
 
 
-separator_char = "-"
-separator_min_len = 4
+SEPARATOR_CHAR = "-"
+SEPARATOR_MIN_LEN = 4
 
 class MenuItem:
+    """
+    All information needed for an item in a menu
+    """
 
-    def __init__(self, line_num, level, label, cmd, is_separator):
-        self.line_num = line_num
+    def __init__(self, level, label, cmd, is_separator):
         self.level = level
         self.label = label
         self.cmd = cmd
@@ -58,9 +59,9 @@ class AscmMenuFile:
         # Define object attributes.
         self.filename = filename
         self.name, self.flat_list = self.get_flat_list(filename)
-        if len(self.flat_list) == 0:
+        if not self.flat_list:
             self.error("Menu file has no menu entries")
-        self.nested_list = self.get_nested_list(self.flat_list, submenu_suffix)
+        self.nested_list = self.get_nested_list(self.flat_list)
 
         for item in self.flat_list:
             if item.subitems:
@@ -80,7 +81,11 @@ class AscmMenuFile:
         raise MenuError(f"{loc}: {msg}")
 
 
-    def get_nested_list(self, flat_list, submenu_suffix):
+    @staticmethod
+    def get_nested_list(flat_list):
+        """
+        TBD
+        """
 
         # Rebuild item list with correct 'is_submenu' field.
         # Attribute 'level' has already been checked in get_flat_list().
@@ -181,7 +186,7 @@ class AscmMenuFile:
         # Read menu file
         line_num = 0
         old_indent = -1
-        reg = re.compile("^ *%s{%i,}$" % (separator_char, separator_min_len))
+        reg = re.compile("^ *%s{%i,}$" % (SEPARATOR_CHAR, SEPARATOR_MIN_LEN))
         with open(filename, 'r') as fh:
             for line in fh.readlines():
                 line_num += 1
@@ -209,7 +214,7 @@ class AscmMenuFile:
                 label, is_separator, cmd = split_entry(line)
 
                 # Create new menu item
-                flat_list.append(MenuItem(line_num, level, label, cmd, is_separator))
+                flat_list.append(MenuItem(level, label, cmd, is_separator))
 
                 # Continue loop
                 old_indent = level

@@ -1,17 +1,17 @@
 #!/usr/bin/python3
-#
-# AscmUiCurses.py: Curses user interface.
-#
+"""
+AscmUiCurses.py: Curses user interface.
+"""
 
 import curses
 
-from AscmExecCmd import *
-from AscmMenuFile import *
-from AscmTextMenu import *
+from AscmExecCmd import CommandExecutor
+from AscmMenuFile import AscmMenuFile
+from AscmTextMenu import AscmTextMenu, MOVE
 
 
 
-help_msg = """ 
+HELP_MSG = """
 Enter           toggle submenu or execute command       Space
 Home            move cursor to top of list              g
 End             move cursor to bottom of list           G
@@ -47,6 +47,9 @@ class AscmUiCurses:
 
 
     def open_curses_screen(self):
+        """
+        TBD
+        """
         self.stdscr = curses.initscr()
         self.is_curses_screen_on = True
         self.stdscr.keypad(True)
@@ -57,6 +60,9 @@ class AscmUiCurses:
 
 
     def close_curses_screen(self):
+        """
+        TBD
+        """
         try:
             curses.endwin()
         except:
@@ -65,6 +71,9 @@ class AscmUiCurses:
 
 
     def redraw_screen(self):
+        """
+        TBD
+        """
 
         # Clear screen
         self.stdscr.clear()
@@ -75,27 +84,36 @@ class AscmUiCurses:
 
         # (re-)adjust screen size
         h, w = self.stdscr.getmaxyx()
-        self.menu.set_screen_size(h - pad_vert, w - pad_vert)
+        self.menu.set_screen_size(h - pad_vert, w - pad_horiz)
 
         # re-draw screen
         self.print_screen_border()
-        self.move_cursor_and_print(Move.none_but_reprint)
+        self.move_cursor_and_print(MOVE.none_but_reprint)
 
 
     def print_screen_border(self, name=""):
+        """
+        TBD
+        """
         if name == "":
             name = self.menu.menu_file.name
         self.stdscr.border()
         self.stdscr.addstr(0, 10, f" {name} ")
 
 
-    def move_cursor_and_print(self, movement=Move.none_but_reprint):
+    def move_cursor_and_print(self, movement=MOVE.none_but_reprint):
+        """
+        TBD
+        """
         for line in self.menu.action(movement):
             attr = curses.A_REVERSE if line.is_cursor else curses.A_NORMAL
             self.stdscr.addstr(line.idx_scr + 2, 2, line.text, attr)
 
 
     def run(self):
+        """
+        TBD
+        """
 
         while True:
             c = self.stdscr.getch()
@@ -108,46 +126,46 @@ class AscmUiCurses:
             # Enter/Space = toggle submenu or execute command, respectively
             elif c in (ord('\n'), ord(' ')):
                 if cur_item.is_submenu:
-                    self.move_cursor_and_print(Move.toggle_submenu)
+                    self.move_cursor_and_print(MOVE.toggle_submenu)
                 else:
                     self.run_command(cur_item.cmd)
 
             # l/Right = open submenu
             elif c in (curses.KEY_RIGHT, ord('l')):
                 if cur_item.is_submenu:
-                    self.move_cursor_and_print(Move.open_submenu)
+                    self.move_cursor_and_print(MOVE.open_submenu)
 
             # g/Home = move to top
             elif c in (curses.KEY_HOME, ord('g')):
-                self.move_cursor_and_print(Move.home)
+                self.move_cursor_and_print(MOVE.home)
 
             # G/End = move to bottom
             elif c in (curses.KEY_END, ord('G')):
-                self.move_cursor_and_print(Move.end)
+                self.move_cursor_and_print(MOVE.end)
 
             # k/Up = move cursor up
             elif c in (curses.KEY_UP, ord('k')):
-                self.move_cursor_and_print(Move.prev)
+                self.move_cursor_and_print(MOVE.prev)
 
             # j/Down = move cursor down
             elif c in (curses.KEY_DOWN, ord('j')):
-                self.move_cursor_and_print(Move.next)
+                self.move_cursor_and_print(MOVE.next)
 
             # h/Left = move up one level
             elif c in (curses.KEY_LEFT, ord('h')):
-                self.move_cursor_and_print(Move.fold_or_up)
+                self.move_cursor_and_print(MOVE.fold_or_up)
 
             # u/PageUp = half a page up
             elif c in (curses.KEY_PPAGE, ord('u')):
-                self.move_cursor_and_print(Move.half_page_up)
+                self.move_cursor_and_print(MOVE.half_page_up)
 
             # d/PageDown = half a page down
             elif c in (curses.KEY_NPAGE, ord('d')):
-                self.move_cursor_and_print(Move.half_page_down)
+                self.move_cursor_and_print(MOVE.half_page_down)
 
             # o/Tab = open submenu recursively
             elif c in (ord('\t'), ord('L')):
-                self.move_cursor_and_print(Move.open_submenu_recursively)
+                self.move_cursor_and_print(MOVE.open_submenu_recursively)
 
             # r/window resized = redraw screen
             elif c in (ord('r'), curses.KEY_RESIZE):
@@ -163,6 +181,9 @@ class AscmUiCurses:
 
 
     def finish(self):
+        """
+        TBD
+        """
         self.close_curses_screen()
 
 
@@ -173,7 +194,7 @@ class AscmUiCurses:
         """
         self.stdscr.clear()
         self.print_screen_border("Keyboard mapping")
-        for idx, line in enumerate(help_msg.split("\n")):
+        for idx, line in enumerate(HELP_MSG.split("\n")):
             self.stdscr.addstr(idx + 1, 2, line)
 
         while True:
@@ -185,6 +206,9 @@ class AscmUiCurses:
 
 
     def run_command(self, cmd):
+        """
+        TBD
+        """
 
         # Check if there's anything to do.
         if cmd.cmd_str == "":
@@ -207,4 +231,4 @@ class AscmUiCurses:
         if switch_to_text_screen:
             self.open_curses_screen()
             self.print_screen_border()
-            self.move_cursor_and_print(Move.none_but_reprint)
+            self.move_cursor_and_print(MOVE.none_but_reprint)

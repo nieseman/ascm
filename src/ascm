@@ -1,22 +1,27 @@
 #!/usr/bin/python3
-#
-# ascm.py: Main program
-#
+"""
+ascm.py: Main program
+"""
 
 import argparse
 import logging
 import signal
 import sys
 
-from AscmExecCmd import *
 
+def quit_program(ui_obj):
+    """
+    Closure to provide ui_obj to inner function.
+    """
 
-def quit_program(signal, frame):
-    """
-    Close curses screen and quit program.
-    """
-    ui.close_curses_screen()
-    sys.exit(0)
+    def _quit_program(_sig, _frame):
+        """
+        Close curses screen and quit program.
+        """
+        ui_obj.close_curses_screen()
+        sys.exit(0)
+
+    return quit_program
 
 
 def get_args() -> argparse.Namespace:
@@ -24,22 +29,27 @@ def get_args() -> argparse.Namespace:
     Obtain command-line arguments.
     """
     parser = argparse.ArgumentParser(
-            description="Offer command menu from menu file")
-    parser.add_argument('--ui',
-            choices=['curses', 'tray', 'window'],
-            default='tray',
-            help="choose user interface (default: 'tray')")
-    parser.add_argument('--icon',
-            help="provide image file for tray icon")
-    parser.add_argument('--pkexec',
-            action='store_true',
-            help="use pkexec instead of sudo")
-    parser.add_argument('--output',
-            choices=['normal', 'info', 'debug'],
-            default='normal',
-            help="method to gain root priviledges")
-    parser.add_argument('menu_file',
-            help="menu configuration file (see menu_syntax)")
+        description="Offer command menu from menu file")
+    parser.add_argument(
+        '--ui',
+        choices=['curses', 'tray', 'window'],
+        default='tray',
+        help="choose user interface (default: 'tray')")
+    parser.add_argument(
+        '--icon',
+        help="provide image file for tray icon")
+    parser.add_argument(
+        '--pkexec',
+        action='store_true',
+        help="use pkexec instead of sudo")
+    parser.add_argument(
+        '--output',
+        choices=['normal', 'info', 'debug'],
+        default='normal',
+        help="method to gain root priviledges")
+    parser.add_argument(
+        'menu_file',
+        help="menu configuration file (see menu_syntax)")
 
     return parser.parse_args()
 
@@ -51,7 +61,6 @@ def main():
 
     # Obtain command-line arguments.
     args = get_args()
-    print(args)
 
     # Set logging level.
     log_level = {
@@ -69,18 +78,20 @@ def main():
 
     # Prepare ascm interface object (GUI or CLI).
     if args.ui == 'curses':
-        import signal
-        signal.signal(signal.SIGINT, quit_program)
         import AscmUiCurses
-        Ui = AscmUiCurses.AscmUiCurses
-    else:   # ui == "window" or "tray"
+        ui_obj = AscmUiCurses.AscmUiCurses(args)
+        signal.signal(signal.SIGINT, quit_program(ui_obj))
+    else:
+        # ui == "window" or "tray"
         import AscmUiGtk
-        Ui = AscmUiGtk.AscmUiGtk
+        ui_obj = AscmUiGtk.AscmUiGtk(args)
+        # cf. https://stackoverflow.com/questions/16410852
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     # Run ascm interface.
-    ui = Ui(args)
-    ui.run()
-    ui.finish()
+    ui_obj.run()
+    ui_obj.finish()
+    sys.exit(0)
 
 
 if __name__ == "__main__":

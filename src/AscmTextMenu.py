@@ -1,7 +1,7 @@
 #!/usr/bin/python3
-#
-# AscmTextMenu.py: Handling of (possibly folded) text menu.
-#
+"""
+AscmTextMenu.py: Handling of (possibly folded) text menu.
+"""
 
 import collections
 import enum
@@ -9,7 +9,7 @@ import enum
 
 
 # Different kinds of movement in the menu
-Move = enum.Enum('Move', """
+MOVE = enum.Enum('MOVE', """
     none_but_reprint
     next
     prev
@@ -29,9 +29,9 @@ Move = enum.Enum('Move', """
 
 # Tuple specifying one line to be printed on screen
 PrintLine = collections.namedtuple('PrintLine', [
-        'idx_scr',      # index on screen (i.e. line number)
-        'is_cursor',    # boolean indicating the cursor's line
-        'text'          # text in line
+    'idx_scr',      # index on screen (i.e. line number)
+    'is_cursor',    # boolean indicating the cursor's line
+    'text'          # text in line
 ])
 
 
@@ -181,7 +181,7 @@ class AscmTextMenu:
             return []
 
 
-    def action(self, move: Move):
+    def action(self, move: MOVE):
         """
         Perform a movement action on the cursor
 
@@ -202,23 +202,23 @@ class AscmTextMenu:
                 return self.pos_cur
 
 
-        # Perform all movements defined in enum 'Move'.
+        # Perform all movements defined in enum 'MOVE'.
         assert 0 <= self.pos_view < len(self.unfolded_items)
         item = self.get_item_under_cursor()
 
-        if move == Move.next:
+        if move == MOVE.next:
             return self.get_updated_lines_after_move(True, +1, True)
 
-        elif move == Move.prev:
+        elif move == MOVE.prev:
             return self.get_updated_lines_after_move(True, -1, True)
 
-        elif move == Move.home:
+        elif move == MOVE.home:
             return self.get_updated_lines_after_move(False, 0, False)
 
-        elif move == Move.end:
+        elif move == MOVE.end:
             return self.get_updated_lines_after_move(False, -1, True)
 
-        elif move == Move.fold_or_up:
+        elif move == MOVE.fold_or_up:
 
             # If current item is an unfolded submenu, fold it.
             try:
@@ -235,18 +235,18 @@ class AscmTextMenu:
                 new_pos = get_index_of_upper_level_item()
                 return self.get_updated_lines_after_move(False, new_pos, False)
 
-        elif move == Move.up_and_fold_submenu:
+        elif move == MOVE.up_and_fold_submenu:
             if item.level > 0:
                 new_pos = get_index_of_upper_level_item()
                 new_cur_item = self.unfolded_items[new_pos]
                 return self.get_updated_lines_after_move(False, new_pos, False)
 
-        elif move == Move.open_submenu:
+        elif move == MOVE.open_submenu:
             self.submenu_unfolded[item] = True
             self.determine_unfolded_items()
             return self.get_updated_lines_after_move(True, 0, False, True)
 
-        elif move == Move.open_submenu_recursively:
+        elif move == MOVE.open_submenu_recursively:
             level = item.level
             self.submenu_unfolded[item] = True
 
@@ -255,7 +255,7 @@ class AscmTextMenu:
                 if _item is item:
                     break
             assert _item is item
-                
+
             # Unfold all lower-level submenus until this submenu ends
             for subitem in self.menu_file.items[idx + 1:]:
                 if subitem.level <= level:
@@ -266,7 +266,7 @@ class AscmTextMenu:
             self.determine_unfolded_items()
             return self.get_updated_lines_after_move(True, 0, False, True)
 
-        elif move == Move.toggle_submenu:
+        elif move == MOVE.toggle_submenu:
             try:
                 visible = not self.submenu_unfolded[item]
             except KeyError:
@@ -275,13 +275,13 @@ class AscmTextMenu:
             self.determine_unfolded_items()
             return self.get_updated_lines_after_move(True, 0, False, True)
 
-        elif move == Move.half_page_up:
+        elif move == MOVE.half_page_up:
             return self.get_updated_lines_after_move(True, -(self.h - 1) // 2, False)
 
-        elif move == Move.half_page_down:
+        elif move == MOVE.half_page_down:
             return self.get_updated_lines_after_move(True, +(self.h - 1) // 2, False)
 
-        elif move == Move.none_but_reprint:
+        elif move == MOVE.none_but_reprint:
             return self.get_updated_lines_after_move(True, 0, False, True)
 
         else:

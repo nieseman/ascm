@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-#
-# Wrapper to execute one from a set of commands (pre-defined in a JSON file).
-#
+"""
+Wrapper to execute one from a set of commands (pre-defined in a JSON file).
+"""
 
 import argparse
 import json
@@ -9,20 +9,27 @@ import subprocess
 import sys
 from typing import Dict
 
-from AscmInputFile import *
+from AscmInputFile import check_dict_str_to_str, expand_vars
 
 
 def get_args() -> argparse.Namespace:
     """
     Obtain command-line arguments.
     """
-    parser = argparse.ArgumentParser(description='Execute configured command.')
-    parser.add_argument('file',
-            help='name of JSON file containing command aliases')
-    parser.add_argument('alias', nargs='?', default="",
-            help='alias of command to be executed')
-    parser.add_argument('--list', action='store_true',
-            help='list all command aliases in JSON file')
+    parser = argparse.ArgumentParser(
+        description='Execute configured command.')
+    parser.add_argument(
+        'file',
+        help='name of JSON file containing command aliases')
+    parser.add_argument(
+        'alias',
+        nargs='?',
+        default="",
+        help='alias of command to be executed')
+    parser.add_argument(
+        '--list',
+        action='store_true',
+        help='list all command aliases in JSON file')
 
     return parser.parse_args()
 
@@ -34,7 +41,7 @@ def load_json(file_name: str) -> Dict[str, str]:
     data = json.load(open(file_name))
 
     # Check structure of JSON
-    assert type(data) is dict, "Top-level element must be a dict."
+    assert isinstance(data, dict), "Top-level element must be a dict."
     check_dict_str_to_str(data, 'variables')
     check_dict_str_to_str(data, 'aliases')
 
@@ -58,7 +65,7 @@ def main():
     # Get command-line arguments, and load JSON file.
     args = get_args()
     try:
-        vars, cmds = load_json(args.file)
+        variables, cmds = load_json(args.file)
     except Exception as e:
         error(f"Could not load file {args.file}: {e}.")
 
@@ -73,10 +80,10 @@ def main():
         cmd = cmds[args.alias]
     except KeyError:
         error(f"Command alias '{args.alias}' not found in file {args.file}.")
-    cmd = expand_vars(cmd, vars)
+    cmd = expand_vars(cmd, variables)
 
     # Execute command.
-    rc = subprocess.run(cmd, shell = True)
+    rc = subprocess.run(cmd, shell=True)
     sys.exit(rc.returncode)
 
 
