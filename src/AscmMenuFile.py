@@ -3,10 +3,12 @@
 AscmMenuFile.py: Handling of menu file.
 """
 
+import json
 import logging
 import re
 
 from AscmExecCmd import Command
+from AscmInputFile import check_dict, expand_var_list, expand_vars_in_text
 
 
 
@@ -18,19 +20,49 @@ class MenuError(Exception):
 SEPARATOR_CHAR = "-"
 SEPARATOR_MIN_LEN = 4
 
-class MenuItem:
-    """
-    All information needed for an item in a menu
-    """
+class Separator:
+    def __init__(self, level: int):
+        self.level = level
 
-    def __init__(self, level, label, cmd, is_separator):
+
+class MenuItem:
+    def __init__(self, level: int, label: str, cmd: Command):
         self.level = level
         self.label = label
         self.cmd = cmd
-        self.subitems = []
-        self.is_separator = is_separator
-        self.is_submenu = False
 
+
+class SubMenu:
+    def __init__(self, level: int, label: str, items: list):
+        self.level = level
+        self.label = label
+        self.items = items
+
+
+def convert_dict(level: int, label: str, d: dict, variables: dict):
+    assert isinstance(label, str)
+
+    if label == "----":
+        assert d is None
+        return Separator(level)
+
+    elif 'cmd' in d:
+        assert d.keys() in ({'cmd'}, {'cmd', 'opts'})
+        cmd_str = expand_vars_in_text(d['cmd'], variables)
+        assert isinstance(cmd_str, str)
+        opts = {}
+        if 'opts' in d:
+            opts_str = d['opts']
+            assert isinstance(opts_str, str)
+            for flag in opts_str.split(','):
+                opts[flag.strip()] = True
+        cmd = Command(label, cmd_str, **opts)
+        return MenuItem(level, label, cmd)
+
+    else:
+        items = [convert_dict(level + 1, key, value, variables)
+                                        for key, value in d.items()]
+        return SubMenu(level, label, items)
 
 
 class AscmMenuFile:
@@ -58,6 +90,10 @@ class AscmMenuFile:
 
         # Define object attributes.
         self.filename = filename
+        self.name = "TBD"
+        self.nested_list = self.load_json(filename)
+
+        return
         self.name, self.flat_list = self.get_flat_list(filename)
         if not self.flat_list:
             self.error("Menu file has no menu entries")
@@ -68,6 +104,20 @@ class AscmMenuFile:
                 item.is_submenu = True
                 item.label += submenu_suffix
        #self.flat_list.clear()
+
+
+    def load_json(self, file_name: str):
+        data = json.load(open(file_name))
+
+        # Check structure of JSON
+        assert isinstance(data, dict), "Top-level element must be a dict."
+        check_dict(data, 'variables')
+        check_dict(data, 'menu', check_str_values=False)
+        variables = data['variables']
+        menu_data = data['menu']
+
+        expand_var_list(variables)
+        return convert_dict(0, "", menu_data, variables)
 
 
     def error(self, msg, line_num=None):

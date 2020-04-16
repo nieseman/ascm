@@ -9,7 +9,7 @@ import subprocess
 import sys
 from typing import Dict
 
-from AscmInputFile import check_dict_str_to_str, expand_vars
+from AscmInputFile import check_dict, expand_var_list, expand_vars_in_text
 
 
 def get_args() -> argparse.Namespace:
@@ -42,8 +42,8 @@ def load_json(file_name: str) -> Dict[str, str]:
 
     # Check structure of JSON
     assert isinstance(data, dict), "Top-level element must be a dict."
-    check_dict_str_to_str(data, 'variables')
-    check_dict_str_to_str(data, 'aliases')
+    check_dict(data, 'variables')
+    check_dict(data, 'aliases')
 
     # Deliver essential results, ignore other parts of JSON file.
     return data['variables'], data['aliases']
@@ -80,7 +80,8 @@ def main():
         cmd = cmds[args.alias]
     except KeyError:
         error(f"Command alias '{args.alias}' not found in file {args.file}.")
-    cmd = expand_vars(cmd, variables)
+    expand_var_list(variables)
+    cmd = expand_vars_in_text(cmd, variables)
 
     # Execute command.
     rc = subprocess.run(cmd, shell=True)

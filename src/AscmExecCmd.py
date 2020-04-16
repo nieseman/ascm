@@ -159,5 +159,5 @@ class CommandExecutor:
         cmd = f"{self.get_editor()} {filename}"
         logging.debug("")
         logging.debug("Edit file '{filename}':")
-        logging.info(f"==> {cmd}")
+        logging.info(f"> {cmd}")
         subprocess.run(cmd, shell=True)

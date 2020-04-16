@@ -4,7 +4,6 @@ AscmUiGtk.py: GTK user interface.
 """
 
 import os
-
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk as gtk
@@ -12,7 +11,7 @@ gi.require_version("AppIndicator3", "0.1")
 from gi.repository import AppIndicator3 as appindicator
 
 from AscmExecCmd import CommandExecutor
-from AscmMenuFile import AscmMenuFile, MenuError
+from AscmMenuFile import AscmMenuFile, MenuError, Separator, MenuItem, SubMenu
 
 
 
@@ -31,17 +30,39 @@ class AscmUiGtk():
         """
         self.args = args
         self.cmd_executor = CommandExecutor(True, args.pkexec)
-        self.indicator, self.tray_menu = self.create_tray_icon()
-        self.cmd_window, self.tree_view, self.tree_store = \
-                self.create_cmd_window()
+        self.indicator = self.create_tray_icon()
+        self.cmd_window, self.tree_view, self.tree_store = self.create_cmd_window()
+
+        self.menu_file = None
         self.load_menu_file(False)
+
+
+    def create_tray_icon(self):
+        """
+        TBD
+        """
+        if self.args.icon is None:
+            icon_path = self.ICON_DEFAULT
+        else:
+            icon_path = self.args.icon
+        icon_path = os.path.abspath(icon_path)
+        appindicator_id = 'ascm_indicator'
+        indicator = appindicator.Indicator.new(
+            appindicator_id,
+            icon_path,
+            appindicator.IndicatorCategory.SYSTEM_SERVICES)
+        tray_menu = gtk.Menu()
+        indicator.set_menu(tray_menu)
+        indicator.set_status(appindicator.IndicatorStatus.ACTIVE)
+
+        return indicator
 
 
     def create_cmd_window(self):
         """
         TBD
         """
-        self.hidden_main_window = gtk.Window()
+        self._hidden_main_window = gtk.Window()
 
         store = gtk.TreeStore(str, int)     # Label
         column = gtk.TreeViewColumn("Task", gtk.CellRendererText(), text=0)
@@ -57,7 +78,7 @@ class AscmUiGtk():
         button_exec = gtk.Button("Execute")
         button_exec.connect('clicked', self.run_cmd_from_window)
 
-        cmd_window = gtk.Dialog(parent=self.hidden_main_window, title="ascm")
+        cmd_window = gtk.Dialog(parent=self._hidden_main_window, title="ascm")
         cmd_window.set_default_size(300, 400)
         cmd_window.connect('delete-event', self.hide_cmd_window)
 
@@ -68,87 +89,51 @@ class AscmUiGtk():
         return cmd_window, treeview, store
 
 
-    def create_tray_icon(self):
+    def add_items_to_tray(self, menu, item):
         """
         TBD
         """
-        if self.args.icon is None:
-            icon_path = self.ICON_DEFAULT
+        if isinstance(item, Separator):
+            menu.append(gtk.SeparatorMenuItem())
         else:
-            icon_path = self.args.icon
-        icon_path = os.path.abspath(icon_path)
-        appindicator_id = 'ascm_indicator'
-        tray_menu = gtk.Menu()
-        indicator = appindicator.Indicator.new(
-            appindicator_id,
-            icon_path,
-            appindicator.IndicatorCategory.SYSTEM_SERVICES)
-        indicator.set_menu(tray_menu)
-        indicator.set_status(appindicator.IndicatorStatus.ACTIVE)
-
-        return indicator, tray_menu
+            menu_item = gtk.MenuItem(item.label)
+            menu.append(menu_item)
+            if isinstance(item, MenuItem) and item.cmd.cmd_str:
+                self.item_map[menu_item] = item
+                menu_item.connect('activate', self.run_cmd_from_tray)
+            if isinstance(item, SubMenu):
+                submenu = gtk.Menu()
+                menu_item.set_submenu(submenu)
+                for item in item.items:
+                    self.add_items_to_tray(submenu, item)
 
 
-    def add_items(self):
+    def add_items_to_cmd_window(self, item):
         """
-        Add items from menu file into tray and command window.
+        TBD
         """
+        if isinstance(item, Separator):
+            return
 
-        def add_items_to_tray(menu, item):
-            """
-            TBD
-            """
-            if item.is_separator:
-                menu.append(gtk.SeparatorMenuItem())
-            else:
-                menu_item = gtk.MenuItem(item.label)
-                menu.append(menu_item)
-                if item.cmd:
-                    self.item_map[menu_item] = item
-                    menu_item.connect('activate', self.run_cmd_from_tray)
-                if item.is_submenu:
-                    submenu = gtk.Menu()
-                    menu_item.set_submenu(submenu)
-                    for subitem in item.subitems:
-                        add_items_to_tray(submenu, subitem)
-
-
-        def add_items_to_cmd_window(item):
-            """
-            TBD
-            """
-            if item.is_separator:
-                return
-            nonlocal idx
-            idx += 1
-            if item.cmd:
-                cmd_win_item = item.label, idx
-            else:
-                cmd_win_item = item.label, 0
-            last_cmd_win_item = self.tree_store.append(
-                upper_level_items[-1], cmd_win_item)
-            upper_level_items.append(last_cmd_win_item)
-            if item.cmd:
-                self.item_map[idx] = item
-            if item.is_submenu:
-                for subitem in item.subitems:
-                    add_items_to_cmd_window(subitem)
-            upper_level_items.pop()
-
-
-        # Main part of add_items().
-        upper_level_items = [None]
-        idx = 0
-        for item in self.menu_file.nested_list:
-            add_items_to_tray(self.tray_menu, item)
-            add_items_to_cmd_window(item)
+        self._idx += 1
+        if isinstance(item, MenuItem):
+            cmd_win_item = item.label, self._idx
+        else:
+            cmd_win_item = item.label, 0
+        last_cmd_win_item = self.tree_store.append(
+            self._items_stack[-1], cmd_win_item)
+        self._items_stack.append(last_cmd_win_item)
+        if isinstance(item, MenuItem):
+            self.item_map[self._idx] = item
+        if isinstance(item, SubMenu):
+            for item in item.items:
+                self.add_items_to_cmd_window(item)
+        self._items_stack.pop()
 
 
     def add_generic_items_to_tray_menu(self):
         """
         Add generic menu items to (already created) tray menu
-
-        Modified instance variables: self.generic_item_map
         """
 
         def add_menu_item(action, label):
@@ -166,8 +151,10 @@ class AscmUiGtk():
         add_menu_item(gtk.main_quit,          'Quit ascm')
         generic_item = gtk.MenuItem('ascm')
         generic_item.set_submenu(submenu)
-        self.tray_menu.append(gtk.SeparatorMenuItem())
-        self.tray_menu.append(generic_item)
+
+        tray_menu = self.indicator.get_menu()
+        tray_menu.append(gtk.SeparatorMenuItem())
+        tray_menu.append(generic_item)
 
 
     def load_menu_file(self, _dummy):
@@ -192,17 +179,21 @@ class AscmUiGtk():
         self.menu_file = menu_file
 
         # Clear all menu items.
-        for item in self.tray_menu.get_children():
-            self.tray_menu.remove(item)
+        tray_menu = self.indicator.get_menu()
+        for item in tray_menu.get_children():
+            tray_menu.remove(item)
 
         # Create new menu items.
         self.item_map = {}
-        self.generic_item_map = {}
-        self.add_items()
+        self._items_stack = [None]
+        self._idx = 0
+        for item in self.menu_file.nested_list.items:
+            self.add_items_to_tray(tray_menu, item)
+            self.add_items_to_cmd_window(item)
         self.add_generic_items_to_tray_menu()
 
         # Show widgets.
-        self.tray_menu.show_all()
+        tray_menu.show_all()
         self.cmd_window.show_all()
         self.cmd_window.set_visible(False)
 

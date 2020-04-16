@@ -68,7 +68,8 @@ def main():
         'info':   logging.INFO,
         'debug':  logging.DEBUG
     }
-    logging.basicConfig(level=log_level[args.output])
+    format_str = "%(asctime)s  %(message)s"
+    logging.basicConfig(level=log_level[args.output], format=format_str)
 
     # Debug output: program arguments.
     logging.debug("")
