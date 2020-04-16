@@ -1,126 +1,137 @@
 #!/usr/bin/python3
+#
+# AscmExecCmd.py: Execution of commands.
+#
 
-import enum
 import logging
 import os
 import subprocess
 import sys
-
-
-class RootMethod(enum.Enum):
-    su = 1
-    sudo = 2
-    pkexec = 3
+from typing import Optional, Tuple
 
 
 class Command:
+    """
+    Container that specifies a command.
 
-    attribs_available = {
-        'wait_after_cmd':       ('w', 1),
-        'run_in_terminal':      ('t', 2),
-        'run_in_background':    ('b', 4),
-        'use_root_permissions': ('r', 8),
-    }
+    Attributes:
+        wait:  wait for <Enter> after cmd
+        term:  run command in a terminal emulator
+        back:  run command in background
+        root:  run command as root
+    """
 
-    def __init__(self, label, cmd_str, attribs):
-        assert(isinstance(cmd_str, str))
-        assert(isinstance(attribs, str) or isinstance(attribs, int))
+    def __init__(self, label: str, cmd_str: str,
+            wait=False, term=False, back=False, root=False):
         self.label = label
         self.cmd_str = cmd_str
-        attribs_given_by_str = isinstance(attribs, str)
-
-        # Set attribute variables.
-        for attrib, (ch, bit) in self.attribs_available.items():
-            if attribs_given_by_str:
-                attrib_is_set = (ch in attribs)
-            else:
-                attrib_is_set = (attribs & bit != 0)
-            self.__dict__[attrib] = attrib_is_set
-
-        # Debug output: selected attributes.
-        logging.debug("New command object, attributes:")
-        for key, value in self.__dict__.items():
-            logging.debug(f"    {key} = {value}")
-
-        # Check that no unknown attribute characters are given.
-        if attribs_given_by_str:
-            all_chars = ''.join([ch for attrib, (ch, bit) in self.attribs_available.items()])
-            for ch in attribs:
-                if ch not in all_chars:
-                    raise Exception(f"Unknown command attribute character: '{ch}'")
-        else:
-            all_bits = sum(bit for attrib, (ch, bit) in self.attribs_available.items())
-            unknown_bits = attribs - (attribs & all_bits)
-            if unknown_bits > 0:
-                raise Exception(f"Unknown command attribute bits: '{unknown_bits}'")
+        self.wait = wait
+        self.term = term
+        self.back = back
+        self.root = root
 
         # Check for reasonable combination of attributes.
-        if self.wait_after_cmd and not self.run_in_terminal:
-            raise Exception("Bad combination of attributes: wait_after_cmd and not run_in_terminal")
-        if self.run_in_background and self.wait_after_cmd:
-            raise Exception("Bad combination of attributes: run_in_background and wait_after_cmd")
-        if self.run_in_background and self.run_in_terminal:
-            raise Exception("Bad combination of attributes: run_in_background and run_in_terminal")
-
-
-    def attribs_int(self):
-        i = 0
-        for attrib, (ch, bit) in self.attribs_available.items():
-            if self.__dict__[attrib]:
-                i += bit
-        return i
-
+        if wait and not term:
+            raise Exception("Bad combination of attributes: wait and not term")
+        if back and wait:
+            raise Exception("Bad combination of attributes: back and wait")
+        if back and term:
+            raise Exception("Bad combination of attributes: back and term")
 
 
 class CommandExecutor:
+    """
+    Class to execute commands, if necessary in a terminal window.
+    """
 
-    def __init__(self, run_from_gui, root_method):
-
-        def get_first_available_program(prg_list):
-            for prg in prg_list:
-                if subprocess.run(f"which {prg} >/dev/null", shell = True).returncode == 0:
-                    return prg
-            return None
-
+    def __init__(self, run_from_gui: bool, use_pkexec: bool):
         self.run_from_gui = run_from_gui
-        self.root_method = root_method
-
-        self.terminal = get_first_available_program(
-                ["x-terminal-emulator", "xfce4-terminal",
-                 "gnome-terminal", "konsole", "xterm"])
-        if self.terminal is None:
-            raise Exception("No terminal available")
-
-        self.editor = get_first_available_program(["gedit", "kedit", "mousepad"])
-        if self.editor is None:
-            self.editor = get_first_available_program(["vi", "emacs", "nano"])
-            if self.editor is None:
-                raise Exception("No editor available")
-            self.editor = f"{self.terminal} {self.editor}"
+        self.use_pkexec = use_pkexec
 
 
-    def run(self, command):
+    @staticmethod
+    def get_first_executable_program(prg_list: list) -> Optional[str]:
+        """
+        Get first program from a list of programs which is executable.
+        """
+        for prg in prg_list:
+            cp = subprocess.run(f"which {prg} >/dev/null", shell=True)
+            if cp.returncode == 0:
+                break
+        else:
+            prg = None
+
+        return prg
+
+
+    def get_terminal(self):
+        """
+        Get terminal emulator program.
+        """
+        editor_choices = [
+                "x-terminal-emulator",
+                "xfce4-terminal",
+                "gnome-terminal",
+                "konsole",
+                "xterm"]
+
+        terminal = self.get_first_executable_program(editor_choices)
+        if terminal is not None:
+            return terminal
+
+        raise Exception("No terminal available")
+
+
+    def get_editor(self):
+        """
+        Get command to execute a text editor.
+        """
+        editor_choices_gui = ["gedit", "kedit", "mousepad"]
+        editor_choices_cli = ["vi", "emacs", "nano"]
+
+        editor = self.get_first_executable_program(editor_choices_gui)
+        if editor is not None:
+            return editor
+
+        editor = self.get_first_executable_program(editor_choices_cli)
+        if editor is not None:
+            if self.run_from_gui:
+                return f"{self.get_terminal()} {editor}"
+            else:
+                return editor
+
+        raise Exception("No editor available")
+
+
+    def run(self, command: Command):
+        """
+        Execute a given command.
+
+        Please note:
+        * If run_from_gui, the 'wait' attribute is accounted for by argument
+          '-hold' to the terminal.
+        * If not run_from_gui, this needs to be accounted for by the code which
+          calls this function.
+        """
         cmd = command.cmd_str
 
         # Compile command.
-        if command.use_root_permissions:
-            if self.root_method == RootMethod.su:
-                cmd = f"su -s -- {cmd}"
-            elif self.root_method == RootMethod.sudo:
-                cmd = f"sudo -s -- {cmd}"
-            else:
+        if command.root:
+            if self.use_pkexec:
                 cmd = f"pkexec {cmd}"
+            else:
+                cmd = f"sudo -s -- {cmd}"
 
-        if command.run_in_background:
+        if command.back:
             if not self.run_from_gui:
                 cmd = f"{cmd} &"
 
-        if command.run_in_terminal:
+        if command.term:
             if self.run_from_gui:
-                # TBD: Use self.terminal
+                # TBD: Use self.get_terminal()
                 # TBD: properly handles terminal options
                 cmd = f"xterm -title '{command.label}' -geometry 120x20 " + \
-                      f"{'-hold' if command.wait_after_cmd else ''} " + \
+                      f"{'-hold' if command.wait else ''} " + \
                       f"-e '{cmd}'"
         else:
             if self.run_from_gui:
@@ -131,35 +142,22 @@ class CommandExecutor:
         logging.debug("Run command:")
         for key, value in command.__dict__.items():
             logging.debug(f"    {key} = {value}")
-        logging.info(f"==> {cmd}")
+        logging.info(f"> {cmd}")
 
-        # Run command.
+        # Run command in a separate process.
         if os.fork() == 0:
-            subprocess.run(cmd, shell = True)
+            subprocess.run(cmd, shell=True)
             os.setsid()
             sys.exit(0)
 
-        # Run command.
-#       fh = open("/home/manni/tmp/ascm.log", "a")
-#       print("", file = fh, flush = True)
-#       if os.fork() == 0:
-#           print("Fork!", file = fh, flush = True)
-#           cp = subprocess.run(cmd, shell = True)
-#           print(type(cp), file = fh, flush = True)
-#           print(cp, file = fh, flush = True)
-#           os.setsid()
-#           sys.exit(0)
-#       else:
-#           print("Parent!", file = fh, flush = True)
-
         # Wait after command.
-        if not self.run_from_gui and command.wait_after_cmd:
+        if not self.run_from_gui and command.wait:
             pass    # TBD: wait
             
 
     def edit(self, filename):
-        cmd = f"{self.editor} {filename}"
+        cmd = f"{self.get_editor()} {filename}"
         logging.debug("")
         logging.debug("Edit file '{filename}':")
         logging.info(f"==> {cmd}")
-        subprocess.run(cmd, shell = True)
+        subprocess.run(cmd, shell=True)

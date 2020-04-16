@@ -9,7 +9,7 @@ import subprocess
 import sys
 from typing import Dict
 
-from AscmConfFile import *
+from AscmInputFile import *
 
 
 def get_args() -> argparse.Namespace:

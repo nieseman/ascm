@@ -1,7 +1,9 @@
 #!/usr/bin/python3
+#
+# AscmMenuFile.py: Handling of menu file.
+#
 
 import collections
-import enum
 import logging
 import re
 
@@ -38,16 +40,7 @@ class AscmMenuFile:
     a list of MenuItem objects.
     """
 
-    def _error(self, msg, line_num = None):
-        """ An error occured while processing the menu, so raise exception. """
-        if line_num is None:
-            loc = f"Menu file {self.filename}"
-        else:
-            loc = f"Menu file {self.filename}, line {line_num}"
-        raise MenuError(f"{loc}: {msg}")
-
-
-    def __init__(self, filename, submenu_suffix = ""):
+    def __init__(self, filename, submenu_suffix=""):
         """
         Initialize menu from menu file
 
@@ -66,7 +59,7 @@ class AscmMenuFile:
         self.filename = filename
         self.name, self.flat_list = self.get_flat_list(filename)
         if len(self.flat_list) == 0:
-            self._error("Menu file has no menu entries")
+            self.error("Menu file has no menu entries")
         self.nested_list = self.get_nested_list(self.flat_list, submenu_suffix)
 
         for item in self.flat_list:
@@ -74,6 +67,17 @@ class AscmMenuFile:
                 item.is_submenu = True
                 item.label += submenu_suffix
        #self.flat_list.clear()
+
+
+    def error(self, msg, line_num=None):
+        """
+        An error occured while processing the menu, so raise exception.
+        """
+        if line_num is None:
+            loc = f"Menu file {self.filename}"
+        else:
+            loc = f"Menu file {self.filename}, line {line_num}"
+        raise MenuError(f"{loc}: {msg}")
 
 
     def get_nested_list(self, flat_list, submenu_suffix):
@@ -130,7 +134,7 @@ class AscmMenuFile:
             indent_width = 4
             num_spaces = len(line) - len(line.lstrip())
             if num_spaces % indent_width != 0:
-                self._error("Indentation mismatch", line_num)
+                self.error("Indentation mismatch", line_num)
             return num_spaces // indent_width
 
 
@@ -152,7 +156,20 @@ class AscmMenuFile:
                     else:
                         options = ""
                     cmd_str = cmd_str.strip()
-                    cmd = Command(label.strip(), cmd_str, options)
+
+                    # TBD: Removed later?
+                    opts = {}
+                    attribs_available = {
+                        'w': 'wait',
+                        't': 'term',
+                        'b': 'back',
+                        'r': 'root',
+                    }
+                    for ch, var in attribs_available.items():
+                        if ch in options:
+                            opts[var] = True
+
+                    cmd = Command(label.strip(), cmd_str, **opts)
 
             return label.strip(), is_separator, cmd
 
@@ -182,11 +199,11 @@ class AscmMenuFile:
 
                 # Determine indentation level of line.
                 level = get_indent_level(line)
-                assert(level >= 0)
+                assert level >= 0
                 logging.debug("")
                 logging.debug(f"line {line_num}, indent level = {level}: {line}")
                 if level > old_indent + 1:
-                    self._error("Indentation error", line_num)
+                    self.error("Indentation error", line_num)
 
                 # Check if label is a separator
                 label, is_separator, cmd = split_entry(line)

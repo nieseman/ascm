@@ -1,4 +1,8 @@
 #!/usr/bin/python3
+#
+# AscmInputFile.py: Functions for handling input files
+#                   (command file and input file).
+#
 
 from typing import Dict
 

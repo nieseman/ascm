@@ -1,6 +1,8 @@
 #!/usr/bin/python3
+#
+# AscmUiGtk.py: GTK user interface.
+#
 
-import enum
 import os
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)    # cf. https://stackoverflow.com/questions/16410852
@@ -19,76 +21,69 @@ from AscmMenuFile import *
 
 class AscmUiGtk():
     """
+    A GTK-based user interface for ascm
 
-    Instance variables:
-    - Menu file: 
-        menu_filename: name of menu file
-        menu_file: MenuFile object
-    - Command window:
-        hidden_main_window: TBD
-        cmd_window: TBD
-        tree_view: TBD     (used to determine currently active element)
-        tree_store: TBD     (used to populate store with data)
-    - Tray icon and menu:
-        item_map: TBD
-        generic_item_map: TBD
-        indicator: TBD
-        tray_menu: TBD
+    It provides a tray icon with command menu as well as a command window.
     """
+
+    ICON_DEFAULT = "ascm_play_solid.svg"    # TBD
     
-    def __init__(self, options):
-        """ Initialize tray and command window, and load menu file. """
-
-        def create_cmd_window():
-            self.hidden_main_window = gtk.Window()
-            store = gtk.TreeStore(str, int)     # Label 
-            treeview = gtk.TreeView(model = store)
-            column = gtk.TreeViewColumn("Task", gtk.CellRendererText(), text = 0)
-            treeview.append_column(column)
-            treeview.set_headers_visible(False)
-            scroll = gtk.ScrolledWindow()
-            scroll.set_vexpand(True)
-            scroll.add(treeview)
-            button_exec = gtk.Button("Execute")
-            button_exec.connect('clicked', self.run_cmd_from_window)
-            cmd_window = gtk.Dialog(parent = self.hidden_main_window, title = "ascm")
-            cmd_window.set_default_size(300, 400)
-            cmd_window.connect('delete-event', self.hide_cmd_window)
-            box = cmd_window.get_content_area()
-            box.add(scroll)
-            box.add(button_exec)
-
-            return cmd_window, treeview, store
-
-
-        def create_tray_icon():
-            if options["icon"]:
-                icon_path = options["icon"]
-            else:
-                icon_path = "ascm_play_solid.svg"
-            icon_path = os.path.abspath(icon_path)
-            appindicator_id = 'ascm_indicator'
-            tray_menu = gtk.Menu()
-            indicator = appindicator.Indicator.new(
-                    appindicator_id,
-                    icon_path,
-                    appindicator.IndicatorCategory.SYSTEM_SERVICES)
-            indicator.set_menu(tray_menu)
-            indicator.set_status(appindicator.IndicatorStatus.ACTIVE)
-
-            return indicator, tray_menu
-
-
-        self.options = options
-        self.cmd_executor = CommandExecutor(True, options["root"])
-        self.indicator, self.tray_menu = create_tray_icon()
-        self.cmd_window, self.tree_view, self.tree_store = create_cmd_window()
-
+    def __init__(self, args):
+        """
+        Initialize tray and command window, and load menu file.
+        """
+        self.args = args
+        self.cmd_executor = CommandExecutor(True, args.pkexec)
+        self.indicator, self.tray_menu = self.create_tray_icon()
+        self.cmd_window, self.tree_view, self.tree_store = \
+                self.create_cmd_window()
         self.load_menu_file(False)
 
 
+    def create_cmd_window(self):
+        self.hidden_main_window = gtk.Window()
+        store = gtk.TreeStore(str, int)     # Label 
+        treeview = gtk.TreeView(model=store)
+        column = gtk.TreeViewColumn("Task", gtk.CellRendererText(), text=0)
+        treeview.append_column(column)
+        treeview.set_headers_visible(False)
+        scroll = gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.add(treeview)
+        button_exec = gtk.Button("Execute")
+        button_exec.connect('clicked', self.run_cmd_from_window)
+        cmd_window = gtk.Dialog(parent=self.hidden_main_window, title="ascm")
+        cmd_window.set_default_size(300, 400)
+        cmd_window.connect('delete-event', self.hide_cmd_window)
+        box=cmd_window.get_content_area()
+        box.add(scroll)
+        box.add(button_exec)
+
+        return cmd_window, treeview, store
+
+
+    def create_tray_icon(self):
+        if self.args.icon is None:
+            icon_path = self.ICON_DEFAULT
+        else:
+            icon_path = self.args.icon
+        icon_path = os.path.abspath(icon_path)
+        appindicator_id = 'ascm_indicator'
+        tray_menu = gtk.Menu()
+        indicator = appindicator.Indicator.new(
+                appindicator_id,
+                icon_path,
+                appindicator.IndicatorCategory.SYSTEM_SERVICES)
+        indicator.set_menu(tray_menu)
+        indicator.set_status(appindicator.IndicatorStatus.ACTIVE)
+
+        return indicator, tray_menu
+
+
     def add_items_to_tray_and_cmd_window(self):
-        """ Add items from menu file into tray and command window. """
+        """
+        Add items from menu file into tray and command window.
+        """
 
         def add_items_to_tray(menu, item):
             if item.is_separator:
@@ -112,9 +107,9 @@ class AscmUiGtk():
             nonlocal idx
             idx += 1
             if item.cmd:
-                cmd_win_item = (item.label, idx)
+                cmd_win_item = item.label, idx
             else:
-                cmd_win_item = (item.label, 0)
+                cmd_win_item = item.label, 0
             last_cmd_win_item = self.tree_store.append(
                     upper_level_items[-1], cmd_win_item)
             upper_level_items.append(last_cmd_win_item)
@@ -158,20 +153,22 @@ class AscmUiGtk():
 
 
     def load_menu_file(self, dummy):
-        """ Load menu file; create & populate tray menu and command window. """
+        """
+        Load menu file; create & populate tray menu and command window.
+        """
 
         # Load menu file
         try:
-            menu_file = AscmMenuFile(self.options["menu_file"])
+            menu_file = AscmMenuFile(self.args.menu_file)
         except MenuError as e:
-            err_msg = f"Cannot process menu file {self.options['menu_file']}.\n" + \
+            err_msg = f"Cannot process menu file {self.args.menu_file}.\n" + \
                        "Reason: {e}"
             gtk.MessageDialog(
-                    parent = None, 
-                    flags = gtk.DialogFlags.MODAL,
-                    type = gtk.MessageType.INFO, 
-                    buttons = gtk.ButtonsType.CLOSE,
-                    message_format = err_msg).run()
+                    parent=None, 
+                    flags=gtk.DialogFlags.MODAL,
+                    type=gtk.MessageType.INFO, 
+                    buttons=gtk.ButtonsType.CLOSE,
+                    message_format=err_msg).run()
             return
 
         self.menu_file = menu_file
@@ -193,14 +190,18 @@ class AscmUiGtk():
      
 
     def run_cmd_from_tray(self, menu_item):
-        """ Called by selection of menu item in system tray menu. """
-        assert(menu_item in self.item_map)
+        """
+        Called by selection of menu item in system tray menu.
+        """
+        assert menu_item in self.item_map
         cmd = self.item_map[menu_item].cmd
         self.cmd_executor.run(cmd)
 
 
     def run_cmd_from_window(self, button):
-        """ Called by button 'Execute' in command window. """
+        """
+        Called by button 'Execute' in command window.
+        """
         (model, iter) = self.tree_view.get_selection().get_selected()
         cmd_idx = model[iter][1]
         if cmd_idx > 0:
@@ -208,28 +209,38 @@ class AscmUiGtk():
             self.cmd_executor.run(cmd)
 
 
-    def hide_cmd_window(self, widget = None, *data):
-        """ Hide command window; activated by close button of command window  """
+    def hide_cmd_window(self, widget=None, *data):
+        """
+        Hide command window; activated by close button of command window
+        """
         self.cmd_window.set_visible(False)
         return True
 
 
     def toggle_cmd_window(self, dummy):
-        """ Show/hide the command window. """
+        """
+        Show/hide the command window.
+        """
         self.cmd_window.set_visible(not self.cmd_window.is_visible())
 
 
     def edit_menu_file(self, dummy):
-        """ Edit the menu file in an external editor. """
-        self.cmd_executor.edit(self.options["menu_file"])
+        """
+        Edit the menu file in an external editor.
+        """
+        self.cmd_executor.edit(self.args.menu_file)
 
 
     def run(self):
-        """ Run the interface. """
+        """
+        Run the interface.
+        """
         # load menu file
         gtk.main()
 
 
     def finish(self):
-        """ Clean-up before quitting program. """
+        """
+        Clean-up before quitting program.
+        """
         pass

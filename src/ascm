@@ -1,90 +1,74 @@
 #!/usr/bin/python3
+#
+# ascm.py: Main program
+#
 
 import argparse
 import logging
 import signal
 import sys
+
 from AscmExecCmd import *
 
 
-if not (sys.version_info[0] == 3 and sys.version_info[1] >= 6):
-    print("Python 3.6+ is needed")  # ... because f-format strings are used.
-    sys.exit(1)
-
-    # For info: Python 3.6+ is provided in
-    # - Debian 10+ (2019-07)
-    # - Ubuntu 18.04+ (2018-04)
-    # - Mint 19+ (2018-06)
-    # - Fedora 26+ (2017-07)
-
-
 def quit_program(signal, frame):
-    """ Close curses screen and quit program. """
+    """
+    Close curses screen and quit program.
+    """
     ui.close_curses_screen()
     sys.exit(0)
 
 
-if __name__ == "__main__":
+def get_args() -> argparse.Namespace:
+    """
+    Obtain command-line arguments.
+    """
+    parser = argparse.ArgumentParser(
+            description="Offer command menu from menu file")
+    parser.add_argument('--ui',
+            choices=['curses', 'tray', 'window'],
+            default='tray',
+            help="choose user interface (default: 'tray')")
+    parser.add_argument('--icon',
+            help="provide image file for tray icon")
+    parser.add_argument('--pkexec',
+            action='store_true',
+            help="use pkexec instead of sudo")
+    parser.add_argument('--output',
+            choices=['normal', 'info', 'debug'],
+            default='normal',
+            help="method to gain root priviledges")
+    parser.add_argument('menu_file',
+            help="menu configuration file (see menu_syntax)")
+
+    return parser.parse_args()
+
+
+def main():
+    """
+    ascm main program
+    """
 
     # Obtain command-line arguments.
-    parser = argparse.ArgumentParser(
-            description = "Offer command menu from menu file")
-    parser.add_argument('--ui',
-            choices = ["curses", "tray", "window"],
-            default = "tray",
-            help = "choose user interface (default: 'tray')")
-    parser.add_argument('--icon',
-            default = "",
-            help = "provide image file for tray icon")
-    parser.add_argument('--root',
-            choices = ["su", "sudo", "pkexec"],
-            help = "method to gain root priviledges")
-    parser.add_argument('--output',
-            choices = ["normal", "info", "debug"],
-            help = "method to gain root priviledges")
-    parser.add_argument('menu_file',
-            nargs = 1,
-            help = "menu configuration file (see menu_syntax)")
-    args = parser.parse_args()
+    args = get_args()
+    print(args)
 
-    # Evaluate command-line arguments into 'opt'.
-    opt = {}
-    opt["ui"] = args.ui
-    opt["menu_file"] = args.menu_file[0]
-    opt["icon"] = args.icon
+    # Set logging level.
+    log_level = {
+        'normal': logging.WARNING,
+        'info':   logging.INFO,
+        'debug':  logging.DEBUG
+    }
+    logging.basicConfig(level=log_level[args.output])
 
-    if "root" == "su":
-        opt["root"] = RootMethod.su
-    elif "root" == "sudo":
-        opt["root"] = RootMethod.sudo
-    elif "root" == "pkexec":
-        opt["root"] = RootMethod.pkexec
-
-    opt["log_level"] = logging.WARNING
-    if args.output == "normal":
-        opt["log_level"] = logging.WARNING
-    elif args.output == "info":
-        opt["log_level"] = logging.INFO
-    elif args.output == "debug":
-        opt["log_level"] = logging.DEBUG
-
-    if opt["ui"] == "curses":
-        if "root" not in opt:
-            opt["root"] = RootMethod.sudo
-    else:   # ui == "window" or "tray"
-        opt["show_window"] = (args.ui == "window")
-        if "root" not in opt:
-            opt["root"] = RootMethod.pkexec
-
-    # Debug output: selected options.
-    logging.basicConfig(level = opt["log_level"])
+    # Debug output: program arguments.
     logging.debug("")
     logging.debug("Selected program options:")
-    for key, value in opt.items():
+    for key, value in vars(args).items():
         logging.debug(f"    {key} = {value}")
 
-    # Prepare ascm interface object.
-    if args.ui == "curses":
+    # Prepare ascm interface object (GUI or CLI).
+    if args.ui == 'curses':
         import signal
         signal.signal(signal.SIGINT, quit_program)
         import AscmUiCurses
@@ -94,6 +78,19 @@ if __name__ == "__main__":
         Ui = AscmUiGtk.AscmUiGtk
 
     # Run ascm interface.
-    ui = Ui(opt)
+    ui = Ui(args)
     ui.run()
     ui.finish()
+
+
+if __name__ == "__main__":
+    if sys.version_info < (3, 6):
+        print("Python 3.6+ is needed.") # ... because f-format strings are used.
+        # Python 3.6+ is provided at least in these distributions:
+        # - Debian 10+ (2019-07)
+        # - Ubuntu 18.04+ (2018-04)
+        # - Mint 19+ (2018-06)
+        # - Fedora 26+ (2017-07)
+        sys.exit(1)
+
+    main()
