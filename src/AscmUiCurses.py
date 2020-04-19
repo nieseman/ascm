@@ -5,9 +5,9 @@ AscmUiCurses.py: Curses user interface.
 
 import curses
 
-from AscmExecCmd import CommandExecutor
-from AscmMenuFile import AscmMenuFile
-from AscmTextMenu import AscmTextMenu, MOVE
+from AscmExecCmd import CommandExecutor, Command
+from AscmMenuFile import load_menu, Menu
+from AscmTextMenu import AscmTextMenuLines, MOVE
 
 
 
@@ -33,13 +33,14 @@ class AscmUiCurses:
     A Curses-based user interface for ascm
     """
 
-    def __init__(self, args):
+    def __init__(self, args: 'argparse.Namespace'):
         self.cmd_executor = CommandExecutor(False, args.pkexec)
 
         # Setup menu items
-        submenu_suffix = "..."
-        menu_file = AscmMenuFile(args.menu_file, submenu_suffix)
-        self.menu = AscmTextMenu(menu_file)
+        menu = load_menu(args.menu_file)
+        for item in menu.items:
+            item.unfolded = True
+        self.menu_lines = AscmTextMenuLines(menu)
 
         # Setup curses
         self.open_curses_screen()
@@ -84,7 +85,7 @@ class AscmUiCurses:
 
         # (re-)adjust screen size
         h, w = self.stdscr.getmaxyx()
-        self.menu.set_screen_size(h - pad_vert, w - pad_horiz)
+        self.menu_lines.set_screen_size(h - pad_vert, w - pad_horiz)
 
         # re-draw screen
         self.print_screen_border()
@@ -96,7 +97,7 @@ class AscmUiCurses:
         TBD
         """
         if name == "":
-            name = self.menu.menu_file.name
+            name = "TBD"    # self.menu_lines.menu.name
         self.stdscr.border()
         self.stdscr.addstr(0, 10, f" {name} ")
 
@@ -105,7 +106,7 @@ class AscmUiCurses:
         """
         TBD
         """
-        for line in self.menu.action(movement):
+        for line in self.menu_lines.action(movement):
             attr = curses.A_REVERSE if line.is_cursor else curses.A_NORMAL
             self.stdscr.addstr(line.idx_scr + 2, 2, line.text, attr)
 
@@ -117,7 +118,7 @@ class AscmUiCurses:
 
         while True:
             c = self.stdscr.getch()
-            cur_item = self.menu.get_item_under_cursor()
+            cur_item = self.menu_lines.get_item_under_cursor()
 
             # q = Exit the while loop
             if c == ord('q'):
@@ -125,14 +126,14 @@ class AscmUiCurses:
 
             # Enter/Space = toggle submenu or execute command, respectively
             elif c in (ord('\n'), ord(' ')):
-                if cur_item.is_submenu:
+                if isinstance(cur_item, Menu):
                     self.move_cursor_and_print(MOVE.toggle_submenu)
                 else:
                     self.run_command(cur_item.cmd)
 
             # l/Right = open submenu
             elif c in (curses.KEY_RIGHT, ord('l')):
-                if cur_item.is_submenu:
+                if isinstance(cur_item, Menu):
                     self.move_cursor_and_print(MOVE.open_submenu)
 
             # g/Home = move to top
@@ -205,7 +206,7 @@ class AscmUiCurses:
         return c == ord('q')
 
 
-    def run_command(self, cmd):
+    def run_command(self, cmd: Command):
         """
         TBD
         """
@@ -218,12 +219,11 @@ class AscmUiCurses:
         switch_to_text_screen = not cmd.back
         if switch_to_text_screen:
             self.close_curses_screen()
+            print("")
             print("_" * 60)
 
-        # Run command.
+        # Run command. Wait for Enter if necessary.
         self.cmd_executor.run(cmd)
-
-        # Wait for Enter.
         if cmd.wait:
             input()
 

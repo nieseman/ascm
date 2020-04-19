@@ -6,6 +6,8 @@ AscmTextMenu.py: Handling of (possibly folded) text menu.
 import collections
 import enum
 
+from AscmMenuFile import Menu, Separator, MenuItem
+
 
 
 # Different kinds of movement in the menu
@@ -36,7 +38,7 @@ PrintLine = collections.namedtuple('PrintLine', [
 
 
 
-class AscmTextMenu:
+class AscmTextMenuLines:
     """
     Handles the contents of a foldable menu in text mode
 
@@ -50,13 +52,18 @@ class AscmTextMenu:
         * action()
     """
 
-    def __init__(self, menu_file):
+    SUBMENU_SUFFIX = "..."
+    SEPARATOR = "------"
+    MIN_W = 20
+    MIN_H = 10
+
+    def __init__(self, menu: Menu):
         """
         Initialize text menu from menu file.
         """
 
         # Define object attributes.
-        self.menu_file = menu_file
+        self.menu = menu
         self.unfolded_items = []        # flat list of entries from self.items
         self.submenu_unfolded = {}      # dictionary from self.items -> bool
         self.h = 0                      # visible height of menu
@@ -64,9 +71,20 @@ class AscmTextMenu:
         self.pos_view = 0               # position of view (first visible line)
         self.pos_cur = 0                # position of cursor
 
-        # Add indentation to menu items
-        for item in self.menu_file.flat_list:
-            item.label = ("    " * item.level) + item.label
+        # Extend labels in menus.
+        max_len = 0
+        for item in self.menu.flat_iter():
+            indent = "    " * (item.level - 1)
+            if isinstance(item, Separator):
+                item.label = f"{indent}{self.SEPARATOR}"
+            elif isinstance(item, MenuItem):
+                item.label = f"{indent}{item.label}"
+            elif isinstance(item, Menu):
+                item.label = f"{indent}{item.label}{self.SUBMENU_SUFFIX}"
+            max_len = max(max_len, len(item.label))
+        self.max_label_len = max_len
+
+        # Screen size not yet set!
 
         # Set visible items
         self.determine_unfolded_items()
@@ -79,7 +97,7 @@ class AscmTextMenu:
         self.unfolded_items.clear()
         level_visible = 0
 
-        for item in self.menu_file.flat_list:
+        for item in self.menu.flat_iter():
 
             # If the item is within the visibility level, add it to the list.
             if item.level <= level_visible:
@@ -91,14 +109,14 @@ class AscmTextMenu:
 
             # If current item is visible and is an opened submenu, increase visibility level.
             try:
-                if item.level == level_visible and item.is_submenu and self.submenu_unfolded[item]:
+                if item.level == level_visible and isinstance(item, Menu) and self.submenu_unfolded[item]:
                     level_visible = item.level + 1
             except KeyError:
                 pass
 
 
     def set_screen_size(self, h, w):
-        max_label_width = max([len(item.label) for item in self.menu_file.flat_list])
+        max_label_width = max([len(item.label) for item in self.menu.flat_iter()])
         self.w = min(w, max_label_width)
         self.h = h
         # TBD: make zero movement
@@ -225,7 +243,7 @@ class AscmTextMenu:
                 is_unfolded = self.submenu_unfolded[item]
             except KeyError:
                 is_unfolded = False
-            if item.is_submenu and is_unfolded:
+            if isinstance(item, Menu) and is_unfolded:
                 self.submenu_unfolded[item] = False
                 self.determine_unfolded_items()
                 return self.get_updated_lines_after_move(True, 0, False, True)
@@ -251,16 +269,16 @@ class AscmTextMenu:
             self.submenu_unfolded[item] = True
 
             # Find cursor item in full list of items
-            for idx, _item in enumerate(self.menu_file.items):
+            for idx, _item in enumerate(self.menu.items):
                 if _item is item:
                     break
             assert _item is item
 
             # Unfold all lower-level submenus until this submenu ends
-            for subitem in self.menu_file.items[idx + 1:]:
+            for subitem in self.menu.items[idx + 1:]:
                 if subitem.level <= level:
                     break
-                if subitem.is_submenu:
+                if isinstance(subitem, Menu):
                     self.submenu_unfolded[subitem] = True
 
             self.determine_unfolded_items()

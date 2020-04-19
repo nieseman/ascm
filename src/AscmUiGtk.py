@@ -42,7 +42,7 @@ class AscmTrayIndicator:
 
     def __init__(self, ui: 'AscmUiGtk', icon: Optional[str]):
         self.ui = ui
-        if icon is None:
+        if icon is None or icon == "":
             icon = self.ICON_DEFAULT
 
         # Create and store tray indicator.
@@ -159,7 +159,7 @@ class AscmCmdWindow:
         box.add(scroll)
         box.add(button_exec)
 
-        self.cmd_window = window
+        self.window = window
         self.tree_view = view
         self.tree_store = store
 
@@ -190,8 +190,8 @@ class AscmCmdWindow:
         # idx_to_cmd is still needed in btn_execute().
 
         # Show widgets.
-        self.cmd_window.show_all()
-        self.cmd_window.set_visible(False)
+        self.window.show_all()
+        self.window.set_visible(False)
 
 
     def add_items_to_tree(self, item):
@@ -228,7 +228,7 @@ class AscmCmdWindow:
         """
         Toggle window between being (non-)visible.
         """
-        self.cmd_window.set_visible(not self.cmd_window.is_visible())
+        self.window.set_visible(not self.window.is_visible())
 
 
 

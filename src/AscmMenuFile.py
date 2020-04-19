@@ -50,8 +50,9 @@ class Menu:
         yield self
         for item in self.items:
             if isinstance(item, Menu):
-                for subitem in item.flat_iter(only_unfolded):
-                    yield subitem
+                if item.unfolded or not only_unfolded:
+                    for subitem in item.flat_iter(only_unfolded):
+                        yield subitem
             else:
                  yield item
             
@@ -108,13 +109,14 @@ def load_menu(file_name: str) -> Menu:
     """
     data = json.load(open(file_name))
 
-    # Check structure of JSON
+    # Check structure of JSON.
     if not isinstance(data, dict):
         raise ValueError("Top-level element must be a dict.")
     check_dict(data, 'variables')
     check_dict(data, 'menu', check_str_values=False)
     variables = data['variables']
-    menu_data = data['menu']
+    menu = data['menu']
 
+    # Convert dict 'menu' to Menu object.
     expand_var_list(variables)
-    return convert_dict(0, "", menu_data, variables)
+    return convert_dict(0, "", menu, variables)
