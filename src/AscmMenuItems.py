@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-AscmMenuFile.py: Handling of JSON menu file.
+AscmMenuItems.py: Handling of JSON menu file.
 """
 
 import json
@@ -21,7 +21,7 @@ class Separator:
         self.level = level
 
 
-class MenuItem:
+class CommandItem:
     """
     A named menu entry providing a command
     """
@@ -48,14 +48,14 @@ class Menu:
         Recursively iterate over all menu items
         """
         yield self
-        for item in self.items:
-            if isinstance(item, Menu):
-                if item.unfolded or not only_unfolded:
+        if self.unfolded or not only_unfolded:
+            for item in self.items:
+                if isinstance(item, Menu):
                     for subitem in item.flat_iter(only_unfolded):
                         yield subitem
-            else:
-                 yield item
-            
+                else:
+                     yield item
+
 
 def convert_dict(level: int, label: str, d: dict, variables: dict):
     """
@@ -76,7 +76,7 @@ def convert_dict(level: int, label: str, d: dict, variables: dict):
             raise ValueError("dict value of separator must be None")
         return Separator(level)
 
-    # MenuItem (identified by dict key 'cmd')
+    # CommandItem (identified by dict key 'cmd')
     elif 'cmd' in d:
         if d.keys() not in ({'cmd'}, {'cmd', 'opts'}):
             raise ValueError("A command entry may only have keys 'cmd' and 'opts'")
@@ -94,7 +94,7 @@ def convert_dict(level: int, label: str, d: dict, variables: dict):
                 opts[flag.strip()] = True
 
         cmd = Command(label, cmd_str, **opts)
-        return MenuItem(level, label, cmd)
+        return CommandItem(level, label, cmd)
 
     # Menu
     else:

@@ -29,7 +29,8 @@ def get_args() -> argparse.Namespace:
     Obtain command-line arguments.
     """
     parser = argparse.ArgumentParser(
-        description="Offer command menu from menu file")
+        description="Offer command menu from menu file",
+        epilog="Project home: https://github.com/nieseman/ascm")
     parser.add_argument(
         '--ui',
         choices=['curses', 'tray', 'window'],

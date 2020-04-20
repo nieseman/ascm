@@ -6,7 +6,7 @@ AscmTextMenu.py: Handling of (possibly folded) text menu.
 import collections
 import enum
 
-from AscmMenuFile import Menu, Separator, MenuItem
+from AscmMenuItems import Menu, Separator, CommandItem
 
 
 
@@ -54,6 +54,7 @@ class AscmTextMenuLines:
 
     SUBMENU_SUFFIX = "..."
     SEPARATOR = "------"
+    INDENT = 4
     MIN_W = 20
     MIN_H = 10
 
@@ -74,10 +75,10 @@ class AscmTextMenuLines:
         # Extend labels in menus.
         max_len = 0
         for item in self.menu.flat_iter():
-            indent = "    " * (item.level - 1)
+            indent = " " * self.INDENT * (item.level - 1)
             if isinstance(item, Separator):
                 item.label = f"{indent}{self.SEPARATOR}"
-            elif isinstance(item, MenuItem):
+            elif isinstance(item, CommandItem):
                 item.label = f"{indent}{item.label}"
             elif isinstance(item, Menu):
                 item.label = f"{indent}{item.label}{self.SUBMENU_SUFFIX}"

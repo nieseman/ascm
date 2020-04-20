@@ -3,7 +3,7 @@
 AscmUiGtk.py: GTK user interface.
 """
 
-import enum
+from enum import Enum, auto
 import os
 from typing import Optional, Union
 
@@ -14,17 +14,16 @@ gi.require_version("AppIndicator3", "0.1")
 from gi.repository import AppIndicator3 as appindicator
 
 from AscmExecCmd import CommandExecutor, Command
-from AscmMenuFile import Separator, MenuItem, Menu, load_menu
+from AscmMenuItems import Separator, CommandItem, Menu, load_menu
 
 
 
 # Menu items for generic tasks (i.e. tasks not defined in the menu file).
-GenericMenuItem = enum.Enum('GenericMenuItem', """
-    toggle_cmd_window
-    edit_menu_file
-    load_menu_file
-    main_quit
-""")
+class GenericMenuItem(Enum):
+    toggle_cmd_window = auto()
+    edit_menu_file = auto()
+    load_menu_file = auto()
+    main_quit = auto()
 
 
 
@@ -93,10 +92,10 @@ class AscmTrayIndicator:
         if isinstance(item, Separator):
             menu.append(gtk.SeparatorMenuItem())
 
-        elif isinstance(item, MenuItem) and item.cmd.cmd_str:
+        elif isinstance(item, CommandItem) and item.cmd.cmd_str:
             self.add_menu_item(menu, item.cmd, item.label)
 
-        else: # isinstance(item, Menu)
+        elif isinstance(item, Menu):
             submenu = gtk.Menu()
             menu_item = gtk.MenuItem(item.label)
             menu_item.set_submenu(submenu)
@@ -136,7 +135,7 @@ class AscmCmdWindow:
     def __init__(self, ui: 'AscmUiGtk'):
         self.ui = ui
 
-        store = gtk.TreeStore(str, int)     # Label
+        store = gtk.TreeStore(str, int)
         column = gtk.TreeViewColumn("Task", gtk.CellRendererText(), text=0)
 
         view = gtk.TreeView(model=store)
@@ -171,11 +170,11 @@ class AscmCmdWindow:
 
         # It seems that in Gtk, items in a list need to be identified by a
         # 32-bit integer index. Therefore, use helper mappings between unique
-        # integers and the commands of MenuItem objects menu items.
+        # integers and the commands of CommandItem objects menu items.
         self.idx_to_cmd = {}
         self.cmd_to_idx = {}
         for idx, item in enumerate(menu.flat_iter()):
-            if isinstance(item, MenuItem):
+            if isinstance(item, CommandItem):
                 cmd = item.cmd
                 self.idx_to_cmd[idx] = cmd
                 self.cmd_to_idx[cmd] = idx
@@ -201,7 +200,7 @@ class AscmCmdWindow:
         if isinstance(item, Separator):
             return
 
-        if isinstance(item, MenuItem):
+        if isinstance(item, CommandItem):
             idx = self.cmd_to_idx[item.cmd]
         else:
             idx = 0

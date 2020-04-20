@@ -150,10 +150,6 @@ class CommandExecutor:
             os.setsid()
             sys.exit(0)
 
-        # Wait after command.
-        if not self.run_from_gui and command.wait:
-            pass    # TBD: wait
-
 
     def edit(self, filename):
         cmd = f"{self.get_editor()} {filename}"
