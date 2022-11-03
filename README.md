@@ -1,6 +1,8 @@
 # ascm
 A simple command menu
 
+**Please see my project [traymenu](https://github.com/nieseman/traymenu),
+  which provides a simpler approach to the same task.**
 
 *What is it?*
 * Ascm provides a text-mode menu, which you can conveniently navigate with the
